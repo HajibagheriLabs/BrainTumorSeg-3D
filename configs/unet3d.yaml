@@ -4,11 +4,17 @@ seed: 42
 
 data:
   root: data/raw/Task01_BrainTumour
+  processed_dir: data/processed
   splits_file: configs/splits.json
   split:
     train: 0.70
     val: 0.15
     test: 0.15
+  # msd has no patient ids but repeats patients across case ids; cases whose
+  # atlas-space thumbnails are this similar are treated as one patient, see DECISIONS.md
+  link:
+    thumbnail_factor: 4
+    threshold: 0.55
   # brats composite regions over msd labels (1 oedema, 2 non-enhancing tumour, 3 enhancing tumour)
   regions:
     WT: [1, 2, 3]
@@ -33,8 +39,16 @@ train:
   loss: dice_ce
   scheduler: cosine
   amp: true
-  augment: true
+  # half the patches are centred on tumour so small lesions are seen often enough
+  foreground_crop_prob: 0.5
   val_every: 5
+
+augment:
+  enabled: true
+  flip_prob: 0.5
+  intensity_prob: 0.5
+  intensity_scale: 0.1
+  intensity_shift: 0.1
 
 inference:
   sw_batch_size: 4

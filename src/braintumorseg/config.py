@@ -44,10 +44,22 @@ class SplitConfig:
 
 
 @dataclass(frozen=True)
+class LinkConfig:
+    thumbnail_factor: int
+    threshold: float
+
+    def __post_init__(self) -> None:
+        _require(self.thumbnail_factor >= 1, "data.link.thumbnail_factor must be >= 1")
+        _require(0.0 < self.threshold <= 1.0, "data.link.threshold must lie in (0, 1]")
+
+
+@dataclass(frozen=True)
 class DataConfig:
     root: Path
+    processed_dir: Path
     splits_file: Path
     split: SplitConfig
+    link: LinkConfig
     regions: dict[str, tuple[int, ...]]
 
     def __post_init__(self) -> None:
@@ -96,7 +108,7 @@ class TrainConfig:
     loss: str
     scheduler: str
     amp: bool
-    augment: bool
+    foreground_crop_prob: float
     val_every: int
 
     def __post_init__(self) -> None:
@@ -109,7 +121,29 @@ class TrainConfig:
         _require(self.weight_decay >= 0.0, "train.weight_decay must be non-negative")
         _choice(self.loss, LOSSES, "train.loss")
         _choice(self.scheduler, SCHEDULERS, "train.scheduler")
+        _require(
+            0.0 <= self.foreground_crop_prob <= 1.0,
+            "train.foreground_crop_prob must lie in [0, 1]",
+        )
         _require(self.val_every > 0, "train.val_every must be positive")
+
+
+@dataclass(frozen=True)
+class AugmentConfig:
+    enabled: bool
+    flip_prob: float
+    intensity_prob: float
+    intensity_scale: float
+    intensity_shift: float
+
+    def __post_init__(self) -> None:
+        _require(0.0 <= self.flip_prob <= 1.0, "augment.flip_prob must lie in [0, 1]")
+        _require(
+            0.0 <= self.intensity_prob <= 1.0,
+            "augment.intensity_prob must lie in [0, 1]",
+        )
+        _require(self.intensity_scale >= 0.0, "augment.intensity_scale must be >= 0")
+        _require(self.intensity_shift >= 0.0, "augment.intensity_shift must be >= 0")
 
 
 @dataclass(frozen=True)
@@ -144,6 +178,7 @@ class Config:
     data: DataConfig
     model: ModelConfig
     train: TrainConfig
+    augment: AugmentConfig
     inference: InferenceConfig
     runtime: RuntimeConfig
 
