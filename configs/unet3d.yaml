@@ -15,6 +15,8 @@ data:
   link:
     thumbnail_factor: 4
     threshold: 0.55
+    # identical voxel data scores 1.0 up to rounding; the next most similar pair is below 0.98
+    duplicate_threshold: 0.999
   # brats composite regions over msd labels (1 oedema, 2 non-enhancing tumour, 3 enhancing tumour)
   regions:
     WT: [1, 2, 3]

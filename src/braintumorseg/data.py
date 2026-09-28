@@ -200,6 +200,16 @@ def preprocess_dataset(cfg: Config, device: torch.device) -> DatasetIndex:
     return index
 
 
+def full_label(processed_dir: Path, meta: dict) -> np.ndarray:
+    """A cached label pasted back into its scan's original grid."""
+    label = np.zeros(meta["shape"], dtype=np.uint8)
+    box = tuple(
+        slice(a, b) for a, b in zip(meta["crop_start"], meta["crop_stop"], strict=True)
+    )
+    label[box] = np.load(processed_dir / "labels" / f"{meta['case_id']}.npy")[0]
+    return label
+
+
 def read_meta(processed_dir: Path, case_ids: list[str]) -> list[dict]:
     return [
         json.loads((processed_dir / "meta" / f"{case_id}.json").read_text("utf-8"))
@@ -302,11 +312,15 @@ def build_splits(cfg: Config, index: DatasetIndex, device: torch.device) -> dict
         volumes = region_voxels(meta, index, cfg.data.regions)
         strata[meta["case_id"]] = ",".join(r for r, n in volumes.items() if n == 0)
     splits = make_splits(groups, strata, cfg.data.split, cfg.seed)
+    identical = torch.triu(similarity >= cfg.data.link.duplicate_threshold, diagonal=1)
     return {
         "seed": cfg.seed,
         "fractions": dataclasses.asdict(cfg.data.split),
         "link_threshold": cfg.data.link.threshold,
         "linked_groups": [list(group) for group in groups if len(group) > 1],
+        "exact_duplicates": [
+            [case_ids[i], case_ids[j]] for i, j in torch.nonzero(identical).tolist()
+        ],
         **splits,
     }
 
@@ -330,7 +344,13 @@ def read_splits(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def case_records(cfg: Config, split: str) -> list[dict[str, str]]:
+def evaluation_cases(splits: dict, split: str) -> list[str]:
+    """Cases scored for a split: a scan stored twice counts once, under its higher id."""
+    superseded = {lower for lower, _ in splits["exact_duplicates"]}
+    return [case_id for case_id in splits[split] if case_id not in superseded]
+
+
+def case_records(cfg: Config, case_ids: list[str]) -> list[dict[str, str]]:
     processed = cfg.data.processed_dir
     return [
         {
@@ -338,5 +358,5 @@ def case_records(cfg: Config, split: str) -> list[dict[str, str]]:
             "image": str(processed / "images" / f"{case_id}.npy"),
             "label": str(processed / "labels" / f"{case_id}.npy"),
         }
-        for case_id in read_splits(cfg.data.splits_file)[split]
+        for case_id in case_ids
     ]

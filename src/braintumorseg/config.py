@@ -47,10 +47,15 @@ class SplitConfig:
 class LinkConfig:
     thumbnail_factor: int
     threshold: float
+    duplicate_threshold: float
 
     def __post_init__(self) -> None:
         _require(self.thumbnail_factor >= 1, "data.link.thumbnail_factor must be >= 1")
         _require(0.0 < self.threshold <= 1.0, "data.link.threshold must lie in (0, 1]")
+        _require(
+            self.threshold <= self.duplicate_threshold <= 1.0,
+            "data.link.duplicate_threshold must lie in [threshold, 1]",
+        )
 
 
 @dataclass(frozen=True)

@@ -6,7 +6,13 @@ import numpy as np
 import torch
 
 from braintumorseg.config import load_config
-from braintumorseg.data import SPLITS, make_splits, read_splits, zscore_normalise
+from braintumorseg.data import (
+    SPLITS,
+    evaluation_cases,
+    make_splits,
+    read_splits,
+    zscore_normalise,
+)
 from braintumorseg.transforms import train_transforms
 
 REPO = Path(__file__).resolve().parents[1]
@@ -24,6 +30,16 @@ def test_committed_splits_share_no_patient() -> None:
     split_of = {case_id: name for name in SPLITS for case_id in members[name]}
     for group in splits["linked_groups"]:
         assert len({split_of[case_id] for case_id in group}) == 1, group
+
+    # a scan stored twice is scored once, under its higher case id
+    superseded = {
+        lower for lower, higher in splits["exact_duplicates"] if lower < higher
+    }
+    assert len(superseded) == len(splits["exact_duplicates"])
+    for name in SPLITS:
+        scored = evaluation_cases(splits, name)
+        assert not superseded & set(scored)
+        assert len(scored) == len(splits[name]) - len(superseded & members[name])
 
 
 def test_split_is_deterministic_under_fixed_seed() -> None:
