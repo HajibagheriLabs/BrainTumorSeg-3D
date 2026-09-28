@@ -1,7 +1,9 @@
 """Dataset parsing, patient-level splits and per-case normalisation."""
 
+import dataclasses
 import json
 import os
+import random
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -11,7 +13,9 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from braintumorseg.config import Config
+from braintumorseg.config import Config, SplitConfig
+
+SPLITS = ("train", "val", "test")
 
 
 @dataclass(frozen=True)
@@ -200,4 +204,139 @@ def read_meta(processed_dir: Path, case_ids: list[str]) -> list[dict]:
     return [
         json.loads((processed_dir / "meta" / f"{case_id}.json").read_text("utf-8"))
         for case_id in case_ids
+    ]
+
+
+def region_voxels(
+    meta: dict, index: DatasetIndex, regions: dict[str, tuple[int, ...]]
+) -> dict[str, int]:
+    return {
+        region: sum(meta["label_voxels"][index.labels[value]] for value in values)
+        for region, values in regions.items()
+    }
+
+
+def thumbnail_similarity(
+    processed_dir: Path, case_ids: list[str], device: torch.device
+) -> torch.Tensor:
+    """Pairwise cosine similarity of the atlas-space thumbnails, shape (n, n)."""
+    vectors = torch.stack(
+        [
+            torch.from_numpy(np.load(processed_dir / "thumbnails" / f"{case_id}.npy"))
+            for case_id in case_ids
+        ]
+    )
+    vectors = F.normalize(vectors.flatten(1).to(device, torch.float32), dim=1)
+    return vectors @ vectors.T
+
+
+def link_repeat_scans(
+    case_ids: list[str], similarity: torch.Tensor, threshold: float
+) -> list[tuple[str, ...]]:
+    """Group cases whose scans are similar enough to belong to the same patient."""
+    parent = list(range(len(case_ids)))
+
+    def root(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    linked = torch.triu(similarity >= threshold, diagonal=1)
+    for i, j in torch.nonzero(linked).tolist():
+        parent[root(i)] = root(j)
+    groups: dict[int, list[str]] = {}
+    for i, case_id in enumerate(case_ids):
+        groups.setdefault(root(i), []).append(case_id)
+    return sorted(tuple(sorted(group)) for group in groups.values())
+
+
+def make_splits(
+    groups: list[tuple[str, ...]],
+    strata: dict[str, str],
+    fractions: SplitConfig,
+    seed: int,
+) -> dict[str, list[str]]:
+    """Assign whole groups to splits so each split gets its share of every stratum."""
+    rng = random.Random(seed)
+    by_stratum: dict[str, list[tuple[str, ...]]] = {}
+    for group in sorted(groups):
+        key = "|".join(sorted({strata[case_id] for case_id in group}))
+        by_stratum.setdefault(key, []).append(group)
+
+    splits: dict[str, list[str]] = {name: [] for name in SPLITS}
+    for key in sorted(by_stratum):
+        members = by_stratum[key]
+        rng.shuffle(members)
+        total = sum(len(group) for group in members)
+        quota = {
+            "val": round(total * fractions.val),
+            "test": round(total * fractions.test),
+        }
+        filled = dict.fromkeys(quota, 0)
+        for group in members:
+            # held-out quotas are never overshot; a group that does not fit trains instead
+            fits = (n for n in ("test", "val") if filled[n] + len(group) <= quota[n])
+            name = next(fits, "train")
+            if name != "train":
+                filled[name] += len(group)
+            splits[name].extend(group)
+    return {name: sorted(ids) for name, ids in splits.items()}
+
+
+def build_splits(cfg: Config, index: DatasetIndex, device: torch.device) -> dict:
+    case_ids = [case.case_id for case in index.cases]
+    processed = cfg.data.processed_dir
+    metas = read_meta(processed, case_ids)
+    factors = {meta["thumbnail_factor"] for meta in metas}
+    if factors != {cfg.data.link.thumbnail_factor}:
+        raise ValueError(
+            f"thumbnails were built with factor {factors}, config says "
+            f"{cfg.data.link.thumbnail_factor}: delete {processed} and rerun make data"
+        )
+    similarity = thumbnail_similarity(processed, case_ids, device)
+    groups = link_repeat_scans(case_ids, similarity, cfg.data.link.threshold)
+    # an empty region makes its dice undefined, so every split gets its share of those cases
+    strata = {}
+    for meta in metas:
+        volumes = region_voxels(meta, index, cfg.data.regions)
+        strata[meta["case_id"]] = ",".join(r for r, n in volumes.items() if n == 0)
+    splits = make_splits(groups, strata, cfg.data.split, cfg.seed)
+    return {
+        "seed": cfg.seed,
+        "fractions": dataclasses.asdict(cfg.data.split),
+        "link_threshold": cfg.data.link.threshold,
+        "linked_groups": [list(group) for group in groups if len(group) > 1],
+        **splits,
+    }
+
+
+def ensure_splits(cfg: Config, index: DatasetIndex, device: torch.device) -> dict:
+    """Write the split file, or check that the committed one is what the config yields."""
+    splits = build_splits(cfg, index, device)
+    path = cfg.data.splits_file
+    if path.exists():
+        if read_splits(path) != splits:
+            raise ValueError(
+                f"{path} differs from the split this config produces; the test split "
+                "must not move silently, so delete the file only if the change is intended"
+            )
+        return splits
+    path.write_text(json.dumps(splits, indent=1) + "\n", encoding="utf-8")
+    return splits
+
+
+def read_splits(path: Path) -> dict:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def case_records(cfg: Config, split: str) -> list[dict[str, str]]:
+    processed = cfg.data.processed_dir
+    return [
+        {
+            "case_id": case_id,
+            "image": str(processed / "images" / f"{case_id}.npy"),
+            "label": str(processed / "labels" / f"{case_id}.npy"),
+        }
+        for case_id in read_splits(cfg.data.splits_file)[split]
     ]
