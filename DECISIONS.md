@@ -82,3 +82,66 @@ move silently.
 ## Unlabelled MSD test images are not used
 
 `imagesTs/` has no labels. All three splits are carved from the 484 labelled cases.
+
+## Metric definitions
+
+Every metric is computed per BraTS region from the merged labels, so a voxel labelled with the
+wrong tumour class still counts as found for whole tumour.
+
+- Dice = 2|P ∩ T| / (|P| + |T|).
+- HD95 is computed between surfaces, where a surface is the set of mask voxels with at least one
+  face neighbour outside the mask. For every surface voxel of one mask, take the distance in mm
+  (using the voxel spacing) to the nearest surface voxel of the other. HD95 is the larger of the
+  two directed 95th percentiles, with linear interpolation.
+
+This is the definition MONAI uses. Two checks back the implementation in `metrics.py`. First,
+hand-computed unit tests, which also fail on each classic mistake injected into the code: IoU in
+place of Dice, a one-sided denominator, one-directional HD95, whole masks in place of surfaces,
+ignoring spacing, and the maximum in place of the 95th percentile. Second, `make crosscheck`
+compares against MONAI on 36 real label pairs: Dice agrees to 2.6e-8 and HD95 to 6.0e-6 mm
+(`reports/metric_crosscheck.csv`). The implementation runs on the GPU, because MONAI's distance
+transform needs cuCIM for that, and cuCIM has no Windows build.
+
+## Empty ground truth
+
+Dice is 0/0 when the truth is empty, so it is undefined; this project does not assign it a value.
+
+| truth | prediction | Dice | HD95 |
+|---|---|---|---|
+| empty | empty | undefined | undefined |
+| empty | non-empty | undefined | undefined |
+| non-empty | empty | 0 | field-of-view diagonal (373.13 mm here) |
+| non-empty | non-empty | computed | computed |
+
+Undefined cases are stored as NaN in per-case tables. They are left out of the distribution and
+counted (`n_undefined`). Empty-truth cases are then scored as detection instead: every summary
+row carries `empty_truth` and `empty_truth_predicted`, the number of false positives. A miss on
+a non-empty truth is never excluded. It scores Dice 0 and the largest distance the scan allows,
+because leaving it out would hide exactly the catastrophic failures this project is meant to
+expose.
+
+The BraTS challenge instead scores both-empty as Dice 1 and a false positive as Dice 0. That folds
+a detection outcome into a segmentation average: with one empty-ET scan in each held-out split, a
+single 0-or-1 value would move the test ET mean by about 1/52 for reasons unrelated to how well
+tumour is outlined. Per-case tables keep the truth and predicted volumes, so BraTS-convention
+figures can still be recomputed for comparison.
+
+## Duplicated scans count once in evaluation
+
+The 114 exact-duplicate pairs are one scan with two annotations. Scoring both copies would count
+that scan twice, against two different truths. Evaluation therefore scores each scan once, against
+the label of the higher case id: 56 of the 71 validation cases and 52 of the 71 test cases
+(`reports/dataset_summary.md`). Every pair joins an id in 1–274 with one in 275–484, which
+suggests two releases concatenated, so the higher id is treated as the later annotation. Without a
+third reader there is no way to know which label is right. What matters is that the rule was fixed
+before any prediction existed, so it cannot drift toward a better score. Training keeps both
+labels: both copies are in the same split, and the model sees the annotation variability.
+
+## Annotation agreement as a reference
+
+The two labels of each duplicated scan are scored against each other with the same metrics
+(`reports/annotation_agreement_summary.csv`). The median agreement between two annotations of an
+identical image is Dice 0.933 (WT), 0.915 (TC) and 0.883 (ET), with HD95 of 3.46, 5.15 and
+2.24 mm. The worst pairs fall to Dice 0.36 (TC) and 0.43 (ET). Model scores near these medians are
+at the label-noise floor. A per-case difference smaller than this spread is not evidence that one
+model is better than another.

@@ -38,6 +38,29 @@ space, and the split is made over the 129 linked patient groups plus the unlinke
 
 ![Tumour volume distribution per region](reports/figures/tumour_volumes.png)
 
+## Evaluation protocol
+
+- **Metrics:** Dice and HD95 (mm) per region, reported as distributions: n, mean, std, median,
+  quartiles, min and max across cases. HD95 is the symmetric 95th-percentile surface distance.
+  Both are verified against hand-computed cases and against MONAI on real label pairs
+  (`make crosscheck`, [`reports/metric_crosscheck.csv`](reports/metric_crosscheck.csv)).
+- **Empty ground truth:** when a region is absent, Dice and HD95 are undefined. Those cases are
+  counted rather than averaged, and scored as detection (was tumour predicted where there is
+  none?). When a region is present but missed, the case scores Dice 0 and an HD95 of the scan
+  diagonal (373.13 mm), and is never dropped.
+- **Duplicated scans** are scored once, so validation has 56 unique scans and test has 52.
+- **Human reference:** MSD ships 114 scans twice, each copy with its own label map. Scoring the
+  two label maps of each scan against each other shows how far annotations of an identical image
+  disagree ([`reports/annotation_agreement_summary.csv`](reports/annotation_agreement_summary.csv)):
+
+| region | Dice median (IQR) | Dice min | HD95 median (IQR), mm |
+|---|---|---|---|
+| WT | 0.933 (0.899–0.956) | 0.712 | 3.46 (2.24–5.79) |
+| TC | 0.915 (0.833–0.949) | 0.361 | 5.15 (2.00–10.41) |
+| ET | 0.883 (0.830–0.927) | 0.426 | 2.24 (1.41–3.46) |
+
+The full rules and the reasoning behind them are in [`DECISIONS.md`](DECISIONS.md).
+
 ## Setup
 
 Requirements: [uv](https://docs.astral.sh/uv/), GNU Make, and for training an NVIDIA GPU with a
@@ -63,9 +86,16 @@ make data
 
 This preprocesses every labelled case once into `data/processed/`: crop to the brain, per-case
 per-channel z-score inside the brain mask, float16 cache. It then links repeat scans, checks that
-`configs/splits.json` is exactly the split the config produces, and writes the dataset statistics
-and figures to `reports/`. The first run decompresses about 7 GB of NIfTI on a single CPU core and
-takes minutes; later runs reuse the cache.
+`configs/splits.json` is exactly the split the config produces, and writes the dataset statistics,
+figures and annotation-agreement reference to `reports/`. The first run decompresses about 7 GB of
+NIfTI on a single CPU core and takes minutes; later runs reuse the cache.
+
+```bash
+make crosscheck
+```
+
+This rechecks `metrics.py` against MONAI's independent Dice and HD95 on real label pairs, and fails
+if they disagree.
 
 `make lint` and `make test` work now. `make train`, `make eval` and `make report` are wired to the
 command-line entrypoint and are filled in as the pipeline is built.
