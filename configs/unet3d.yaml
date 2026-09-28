@@ -1,0 +1,49 @@
+# baseline 3d u-net on msd task01; paths are relative to the repository root
+name: unet3d_baseline
+seed: 42
+
+data:
+  root: data/raw/Task01_BrainTumour
+  splits_file: configs/splits.json
+  split:
+    train: 0.70
+    val: 0.15
+    test: 0.15
+  # brats composite regions over msd labels (1 oedema, 2 non-enhancing tumour, 3 enhancing tumour)
+  regions:
+    WT: [1, 2, 3]
+    TC: [2, 3]
+    ET: [3]
+
+model:
+  architecture: unet
+  in_channels: 4
+  out_channels: 4
+  channels: [32, 64, 128, 256, 320]
+  strides: [2, 2, 2, 2]
+  num_res_units: 2
+  dropout: 0.0
+
+train:
+  patch_size: [128, 128, 128]
+  batch_size: 2
+  epochs: 300
+  learning_rate: 1.0e-4
+  weight_decay: 1.0e-5
+  loss: dice_ce
+  scheduler: cosine
+  amp: true
+  augment: true
+  val_every: 5
+
+inference:
+  sw_batch_size: 4
+  overlap: 0.5
+  blend_mode: gaussian
+
+runtime:
+  device: cuda
+  # the cpu is the bottleneck next to the gpu, so no loader worker processes and few threads
+  num_threads: 2
+  num_workers: 0
+  output_dir: runs
