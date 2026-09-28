@@ -15,6 +15,29 @@ the model fails, small lesions in particular.
 TBD. No model has been trained yet. Every number that appears here will be produced by a script in
 this repository and written to `reports/`.
 
+## Data
+
+484 labelled cases from MSD Task01_BrainTumour (BraTS-derived), each a co-registered 240 x 240 x 155
+volume at 1 mm isotropic spacing with four sequences. Labels are oedema, non-enhancing tumour and
+enhancing tumour, evaluated as the BraTS regions WT, TC and ET. Enhancing tumour is absent in 12
+cases, so ET Dice is undefined for them. Per-case statistics are in
+[`reports/dataset_stats.csv`](reports/dataset_stats.csv) and the summary in
+[`reports/dataset_summary.md`](reports/dataset_summary.md).
+
+**Case ids are not patients.** MSD has no patient identifiers, and the same patient appears under
+several case ids. 228 cases are exact image duplicates of another case (in 108 of the 114 pairs
+with a different label map), and further cases are repeat scans of one patient at different
+timepoints. A case-level random split would leave 42 of 73 test cases with a scan of the same
+patient in the training set. Cases are therefore linked by image similarity in the shared atlas
+space, and the split is made over the 129 linked patient groups plus the unlinked cases:
+342 / 71 / 71 cases for train / validation / test, committed in
+[`configs/splits.json`](configs/splits.json). The reasoning and the threshold evidence are in
+[`DECISIONS.md`](DECISIONS.md).
+
+![Nearest-case similarity with the link threshold](reports/figures/repeat_scans.png)
+
+![Tumour volume distribution per region](reports/figures/tumour_volumes.png)
+
 ## Setup
 
 Requirements: [uv](https://docs.astral.sh/uv/), GNU Make, and for training an NVIDIA GPU with a
@@ -34,8 +57,18 @@ and extract it so that `data/raw/Task01_BrainTumour/` contains `dataset.json`, `
 
 ## Usage
 
-TBD. `make lint` and `make test` work now; `make data`, `make train`, `make eval` and `make report`
-are wired to the command-line entrypoint and are filled in as the pipeline is built.
+```bash
+make data
+```
+
+This preprocesses every labelled case once into `data/processed/`: crop to the brain, per-case
+per-channel z-score inside the brain mask, float16 cache. It then links repeat scans, checks that
+`configs/splits.json` is exactly the split the config produces, and writes the dataset statistics
+and figures to `reports/`. The first run decompresses about 7 GB of NIfTI on a single CPU core and
+takes minutes; later runs reuse the cache.
+
+`make lint` and `make test` work now. `make train`, `make eval` and `make report` are wired to the
+command-line entrypoint and are filled in as the pipeline is built.
 
 ## License
 
