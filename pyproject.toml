@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "braintumorseg"
+version = "0.1.0"
+description = "3D brain tumour segmentation from multi-sequence MRI with patient-level evaluation"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = "==3.11.*"
+dependencies = [
+    "torch~=2.14.0",
+    "monai~=1.6.1",
+    "nibabel~=5.4.2",
+    "SimpleITK~=2.5.6",
+    "numpy~=2.4.6",
+    "scipy~=1.17.1",
+    "pandas~=3.0.6",
+    "matplotlib~=3.11.2",
+    "mlflow~=3.16.1",
+    "PyYAML~=6.0.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest~=9.1.1",
+    "ruff~=0.16.9",
+]
+
+[project.scripts]
+braintumorseg = "braintumorseg.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+target-version = "py311"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
