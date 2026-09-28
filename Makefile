@@ -8,7 +8,7 @@ else
 PY := .venv/bin/python
 endif
 
-.PHONY: setup env test lint format data train eval report
+.PHONY: setup env test lint format data crosscheck train eval report
 
 setup:
 	uv venv --allow-existing --python 3.11 .venv
@@ -33,6 +33,9 @@ data:
 	$(PY) -m braintumorseg.cli data --config $(CONFIG)
 	$(PY) scripts/inspect_data.py --config $(CONFIG)
 	$(PY) scripts/annotation_agreement.py --config $(CONFIG)
+
+crosscheck:
+	$(PY) scripts/crosscheck_metrics.py --config $(CONFIG)
 
 train:
 	$(PY) -m braintumorseg.cli train --config $(CONFIG)
