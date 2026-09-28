@@ -31,6 +31,7 @@ format:
 
 data:
 	$(PY) -m braintumorseg.cli data --config $(CONFIG)
+	$(PY) scripts/inspect_data.py --config $(CONFIG)
 
 train:
 	$(PY) -m braintumorseg.cli train --config $(CONFIG)
