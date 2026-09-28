@@ -15,12 +15,14 @@ Written by `scripts/inspect_data.py` from the preprocessed cache; do not edit.
 
 ## Cases per split and empty labels
 
-| split | cases | empty WT | empty TC | empty ET |
-|---|---:|---:|---:|---:|
-| train | 342 | 0 | 0 | 10 |
-| val | 71 | 0 | 0 | 1 |
-| test | 71 | 0 | 0 | 1 |
-| all | 484 | 0 | 0 | 12 |
+Scored cases count each duplicated scan once, see DECISIONS.md.
+
+| split | cases | scored | empty WT | empty TC | empty ET |
+|---|---:|---:|---:|---:|---:|
+| train | 342 | 262 | 0 | 0 | 10 |
+| val | 71 | 56 | 0 | 0 | 1 |
+| test | 71 | 52 | 0 | 0 | 1 |
+| all | 484 | 370 | 0 | 0 | 12 |
 
 ## Tumour volume per region (mL, non-empty cases)
 

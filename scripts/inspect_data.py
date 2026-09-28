@@ -34,8 +34,6 @@ GRID = "#e1e0d9"
 SURFACE = "#fcfcfb"
 SERIES = "#2a78d6"
 MARKER = "#eb6834"
-# identical voxel data scores 1.0 up to float rounding; the next pairs sit below 0.98
-DUPLICATE_SIMILARITY = 0.999
 SWEEP_RANGE = (0.40, 0.96, 0.01)
 
 
@@ -141,13 +139,10 @@ def summary_markdown(
     groups = len(splits["linked_groups"])
     outside = frame["tumour_voxels_outside_brain"].sum()
     threshold = cfg.data.link.threshold
-    duplicated = int((nearest >= DUPLICATE_SIMILARITY).sum())
+    pairs = splits["exact_duplicates"]
+    duplicated = len({case_id for pair in pairs for case_id in pair})
     volumes = frame.set_index("case_id")[[f"{r.lower()}_ml" for r in regions]]
-    pairs = frame.loc[nearest >= DUPLICATE_SIMILARITY, ["case_id", "nearest_case"]]
-    relabelled = sum(
-        (volumes.loc[case] != volumes.loc[other]).any()
-        for case, other in pairs.itertuples(index=False)
-    )
+    relabelled = sum((volumes.loc[a] != volumes.loc[b]).any() for a, b in pairs)
     leaked = ", ".join(f"{n} of {total} {name}" for name, (n, total) in leakage.items())
     lines = [
         "# Dataset summary",
@@ -159,9 +154,8 @@ def summary_markdown(
         f"- Voxel spacing (mm): {_unique(frame, 'spacing')}",
         f"- Tumour voxels outside the brain mask: {outside}",
         "- Cases whose image reappears under another case id "
-        + f"(similarity >= {DUPLICATE_SIMILARITY}): {duplicated}",
-        f"- Duplicate pairs whose two label maps differ: {relabelled // 2} "
-        + f"of {duplicated // 2}",
+        + f"(similarity >= {cfg.data.link.duplicate_threshold}): {duplicated}",
+        f"- Duplicate pairs whose two label maps differ: {relabelled} of {len(pairs)}",
         f"- Repeat-scan groups linked at similarity >= {threshold}: {groups}, "
         + f"covering {int(linked.sum())} cases",
         f"- Lowest nearest-case similarity among linked cases: {nearest[linked].min():.4f}",
@@ -171,15 +165,21 @@ def summary_markdown(
         "",
         "## Cases per split and empty labels",
         "",
-        "| split | cases | " + " | ".join(f"empty {r}" for r in regions) + " |",
-        "|---|---:|" + "---:|" * len(regions),
+        "Scored cases count each duplicated scan once, see DECISIONS.md.",
+        "",
+        "| split | cases | scored | "
+        + " | ".join(f"empty {r}" for r in regions)
+        + " |",
+        "|---|---:|---:|" + "---:|" * len(regions),
     ]
+    superseded = {lower for lower, _ in pairs}
     parts = [(name, frame[frame["split"] == name]) for name in SPLITS] + [
         ("all", frame)
     ]
     for name, part in parts:
+        scored = int((~part["case_id"].isin(superseded)).sum())
         empty = [str(int((part[f"{r.lower()}_ml"] == 0).sum())) for r in regions]
-        lines.append(f"| {name} | {len(part)} | " + " | ".join(empty) + " |")
+        lines.append(f"| {name} | {len(part)} | {scored} | " + " | ".join(empty) + " |")
     lines += ["", "## Tumour volume per region (mL, non-empty cases)", ""]
     lines += [
         "| region | cases | min | p25 | median | p75 | max |",
@@ -279,7 +279,9 @@ def linkage_figure(cfg: Config, frame: pd.DataFrame, path: Path) -> None:
         fontsize=9,
     )
     ax.set_ylabel("cases", color=INK_SECONDARY, fontsize=9)
-    duplicated = int((frame["nearest_similarity"] >= DUPLICATE_SIMILARITY).sum())
+    duplicated = int(
+        (frame["nearest_similarity"] >= cfg.data.link.duplicate_threshold).sum()
+    )
     ax.annotate(
         f"{duplicated} exact duplicates ",
         xy=(bins[-2], duplicated),
