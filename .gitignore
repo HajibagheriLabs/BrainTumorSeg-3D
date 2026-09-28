@@ -9,3 +9,16 @@ mlruns/
 *.onnx
 __pycache__/
 .venv/
+*.ckpt
+*.safetensors
+*.nii
+*.nii.gz
+*.npy
+*.npz
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+.env
