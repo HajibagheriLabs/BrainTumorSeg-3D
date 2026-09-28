@@ -278,4 +278,4 @@ def _plain(value: Any) -> Any:
 
 def save_config(cfg: Config, path: str | Path) -> None:
     text = yaml.safe_dump(_plain(dataclasses.asdict(cfg)), sort_keys=False)
-    Path(path).write_text(text, encoding="utf-8")
+    Path(path).write_text(text, encoding="utf-8", newline="\n")

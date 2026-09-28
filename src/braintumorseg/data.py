@@ -322,7 +322,7 @@ def ensure_splits(cfg: Config, index: DatasetIndex, device: torch.device) -> dic
                 "must not move silently, so delete the file only if the change is intended"
             )
         return splits
-    path.write_text(json.dumps(splits, indent=1) + "\n", encoding="utf-8")
+    path.write_text(json.dumps(splits, indent=1) + "\n", "utf-8", newline="\n")
     return splits
 
 

@@ -317,12 +317,15 @@ def main() -> None:
     frame = case_table(cfg, index, splits, similarity)
     figures = args.out / "figures"
     figures.mkdir(parents=True, exist_ok=True)
-    frame.to_csv(args.out / "dataset_stats.csv", index=False)
+    # explicit lf so regenerated reports are byte-identical on every platform
+    frame.to_csv(args.out / "dataset_stats.csv", index=False, lineterminator="\n")
     sweep = threshold_sweep(similarity, frame["case_id"].tolist())
-    sweep.to_csv(args.out / "link_threshold_sweep.csv", index=False)
+    sweep.to_csv(
+        args.out / "link_threshold_sweep.csv", index=False, lineterminator="\n"
+    )
     leakage = naive_leakage(cfg, splits, frame["case_id"].tolist())
     summary = summary_markdown(cfg, frame, splits, leakage)
-    (args.out / "dataset_summary.md").write_text(summary, encoding="utf-8")
+    (args.out / "dataset_summary.md").write_text(summary, "utf-8", newline="\n")
     volume_figure(cfg, frame, figures / "tumour_volumes.png")
     linkage_figure(cfg, frame, figures / "repeat_scans.png")
     print(summary)
