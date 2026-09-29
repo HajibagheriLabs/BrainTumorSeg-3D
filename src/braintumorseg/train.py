@@ -68,10 +68,16 @@ def _git_state() -> dict[str, str]:
         ).stdout.strip()
         status = subprocess.run(
             ["git", "status", "--porcelain"], capture_output=True, text=True, check=True
-        ).stdout.strip()
+        ).stdout.splitlines()
     except (OSError, subprocess.CalledProcessError):
         return {"git_commit": "unavailable"}
-    return {"git_commit": commit, "git_dirty": str(bool(status))}
+    # the paths, not just a flag, show whether an uncommitted change could touch the result
+    dirty = ", ".join(line[3:] for line in status if line.strip())
+    return {
+        "git_commit": commit,
+        "git_dirty": str(bool(dirty)),
+        "git_dirty_paths": dirty,
+    }
 
 
 @contextmanager
