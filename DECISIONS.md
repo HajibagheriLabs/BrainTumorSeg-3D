@@ -182,5 +182,18 @@ Python, NumPy, PyTorch, the MONAI transform chain and the data loader order are 
 the config. cuDNN autotuning stays on, and some GPU kernels are non-deterministic, so two runs of
 the same config agree closely but not bit for bit. Forcing deterministic kernels would slow
 training for a guarantee that no reported number depends on. Each MLflow run records the config,
-seed, git commit, whether the tree was dirty, the GPU and the run directory. A run interrupted
+seed, git commit, which paths were uncommitted, the GPU and the run directory. A run interrupted
 mid-way resumes from its last checkpoint when `make train` is rerun.
+
+## Training length: 300 epochs, and why that counts as converged
+
+One epoch passes every training case once: 342 cases at batch size 2, so 171 steps. 300 epochs
+with a cosine schedule to zero is in line with MONAI's BraTS recipes in samples seen. What decides
+it is the curve (`reports/baseline_history.csv`). Over the last eight validations, epochs 265–300,
+mean validation Dice stays between 0.8115 and 0.8135 while the learning rate anneals to zero.
+Longer training would buy at most a change of that order, well inside the case-to-case spread.
+The best checkpoint is from epoch 275.
+
+The baseline run was interrupted once, by the session that launched it ending after epoch 9. It
+resumed from the epoch-5 checkpoint, so epochs 6–9 were retrained. Its MLflow record names the one
+uncommitted path at launch, `DECISIONS.md`; the code was exactly the recorded commit.

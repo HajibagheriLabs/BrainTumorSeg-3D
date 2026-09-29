@@ -12,8 +12,45 @@ the model fails, small lesions in particular.
 
 ## Results
 
-TBD. No model has been trained yet. Every number that appears here will be produced by a script in
-this repository and written to `reports/`.
+Validation only so far. The test split has not been evaluated; it will be scored once, after the
+configuration is frozen.
+
+### Baseline 3D U-Net on the validation split
+
+[`configs/unet3d.yaml`](configs/unet3d.yaml) trains a MONAI U-Net on 128³ patches with Dice +
+cross-entropy, AdamW, a cosine schedule and mixed precision, for 300 epochs. It keeps the checkpoint
+with the best mean validation Dice (epoch 275). Scores are for the 56 unique validation scans:
+[`reports/baseline_results.csv`](reports/baseline_results.csv) holds the distributions and
+[`reports/baseline_val_cases.csv`](reports/baseline_val_cases.csv) one row per scan.
+
+| region | metric | n | mean ± std | median | IQR | min | max |
+|---|---|---:|---|---:|---|---:|---:|
+| WT | Dice | 56 | 0.889 ± 0.086 | 0.917 | 0.865–0.948 | 0.566 | 0.974 |
+| TC | Dice | 56 | 0.806 ± 0.168 | 0.866 | 0.748–0.920 | 0.204 | 0.967 |
+| ET | Dice | 55 | 0.745 ± 0.206 | 0.800 | 0.652–0.879 | 0.000 | 0.958 |
+| WT | HD95 (mm) | 56 | 9.81 ± 14.32 | 4.63 | 2.24–10.23 | 1.41 | 62.61 |
+| TC | HD95 (mm) | 56 | 10.12 ± 12.94 | 5.29 | 3.00–10.51 | 1.41 | 66.06 |
+| ET | HD95 (mm) | 55 | 13.05 ± 50.85 | 3.00 | 1.73–5.82 | 1.00 | 373.13 |
+
+ET is undefined for the one validation scan with no enhancing tumour; the model correctly predicted
+none there.
+
+- **The mean hides the failures.** One scan's enhancing tumour is missed completely: Dice 0, and an
+  HD95 of 373.13 mm, the scan diagonal. That single case pulls the ET HD95 mean to 13.05 mm, while
+  the median is 3.00 mm.
+- **Small lesions fail.** The three lowest ET Dice scores (0.000, 0.018 and 0.259) belong to the
+  three smallest enhancing lesions in the validation split (0.35, 0.32 and 0.03 mL). The test-set
+  failure analysis will quantify this.
+- **Against the human reference** (two annotations of the same scan, measured on the 114
+  duplicated scans rather than these), median Dice is 0.917 vs 0.933 for WT, 0.866 vs 0.915 for TC,
+  and 0.800 vs 0.883 for ET. The gap is smallest for whole tumour.
+- **Training converged.** Over the last eight validations (epochs 265–300), mean validation Dice
+  stayed between 0.8115 and 0.8135
+  ([`reports/baseline_history.csv`](reports/baseline_history.csv)).
+
+![Per-case validation Dice and HD95 for the baseline](reports/figures/baseline_val_boxplot.png)
+
+![Training loss and validation Dice per epoch](reports/figures/baseline_training_curve.png)
 
 ## Data
 
@@ -97,8 +134,25 @@ make crosscheck
 This rechecks `metrics.py` against MONAI's independent Dice and HD95 on real label pairs, and fails
 if they disagree.
 
-`make lint` and `make test` work now. `make train`, `make eval` and `make report` are wired to the
-command-line entrypoint and are filled in as the pipeline is built.
+```bash
+make train
+make eval
+make report
+```
+
+`make train` trains the config (default `configs/unet3d.yaml`, or pass `CONFIG=...`) into
+`runs/<name>/`. It keeps the checkpoint with the best validation Dice, and rerunning it resumes an
+interrupted run. On an RTX 3090 the baseline takes about an hour. `make eval` scores that
+checkpoint on the validation split with the full metrics; the command line refuses the test
+split until the configuration is frozen. `make report` writes the tables and figures in
+`reports/`. Every run is logged to a local MLflow store in `mlruns/`, including the config, seed,
+per-epoch metrics, git commit and run directory. To browse it:
+
+```bash
+.venv/Scripts/mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db
+```
+
+(On Linux or macOS the executable is `.venv/bin/mlflow`.)
 
 ## License
 
