@@ -22,3 +22,4 @@ dist/
 .ruff_cache/
 .ipynb_checkpoints/
 .env
+mlflow.db
