@@ -25,6 +25,7 @@ METRIC_LABELS = {
     "dice": "Dice (higher is better)",
     "hd95": "HD95 in mm (lower is better)",
 }
+HD95_TICKS = (0, 1, 2, 5, 10, 20, 50, 100, 200, 400)
 
 
 def _style(ax: plt.Axes) -> None:
@@ -80,6 +81,15 @@ def boxplot_figure(
             )
         ax.set_xticks(range(1, len(regions) + 1), regions)
         ax.set_ylabel(METRIC_LABELS[metric], color=INK_SECONDARY, fontsize=9)
+        if metric == "hd95":
+            # one miss scores the 373 mm scan diagonal; a linear axis would flatten the rest,
+            # and symlog stays linear below 1 mm because a perfect boundary scores 0
+            ax.set_yscale("symlog", linthresh=1.0)
+            ax.set_ylim(bottom=0)
+            ax.set_yticks(HD95_TICKS, [f"{tick:g}" for tick in HD95_TICKS])
+            ax.set_ylabel(
+                f"{METRIC_LABELS[metric]}, log scale", color=INK_SECONDARY, fontsize=9
+            )
         _style(ax)
     counts = ", ".join(f"{r} n={len(cases[f'{r}_dice'].dropna())}" for r in regions)
     fig.suptitle(title, color=INK, fontsize=12, x=0.01, ha="left")
@@ -87,11 +97,12 @@ def boxplot_figure(
         0.01,
         0.005,
         f"One point per validation scan ({counts}). Dotted line: median agreement between "
-        "two annotations of the same scan.",
+        "two annotations of the same scan.\nA region the model misses entirely scores the "
+        "scan diagonal (373 mm here) as its HD95.",
         color=INK_SECONDARY,
         fontsize=8.5,
     )
-    fig.tight_layout(rect=(0, 0.04, 1, 1))
+    fig.tight_layout(rect=(0, 0.07, 1, 1))
     fig.savefig(path, dpi=150, facecolor=SURFACE)
     plt.close(fig)
 
