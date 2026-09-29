@@ -59,7 +59,10 @@ inference:
 
 runtime:
   device: cuda
-  # the cpu is the bottleneck next to the gpu, so no loader worker processes and few threads
   num_threads: 2
-  num_workers: 0
+  # the cropped float16 cases fit in 24 GB next to the model, so after one load from disk
+  # every crop and augmentation runs on the gpu and the cpu only launches kernels
+  cache_on_device: true
   output_dir: runs
+  tracking_dir: mlruns
+  experiment: braintumorseg-3d

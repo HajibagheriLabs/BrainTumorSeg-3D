@@ -11,7 +11,7 @@ import yaml
 
 ARCHITECTURES = ("unet", "attention_unet")
 LOSSES = ("dice", "dice_ce", "dice_focal")
-SCHEDULERS = ("cosine", "plateau")
+SCHEDULERS = ("cosine",)
 BLEND_MODES = ("gaussian", "constant")
 DEVICES = ("cuda", "cpu")
 
@@ -167,13 +167,15 @@ class InferenceConfig:
 class RuntimeConfig:
     device: str
     num_threads: int
-    num_workers: int
+    cache_on_device: bool
     output_dir: Path
+    tracking_dir: Path
+    experiment: str
 
     def __post_init__(self) -> None:
         _choice(self.device, DEVICES, "runtime.device")
         _require(self.num_threads > 0, "runtime.num_threads must be positive")
-        _require(self.num_workers >= 0, "runtime.num_workers must be non-negative")
+        _require(bool(self.experiment), "runtime.experiment must be non-empty")
 
 
 @dataclass(frozen=True)
