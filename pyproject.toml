@@ -40,3 +40,5 @@ target-version = "py311"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# raised inside mlflow's own sqlalchemy models, not by this code
+filterwarnings = ["ignore:The ``noload`` loader strategy is deprecated"]
