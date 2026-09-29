@@ -44,4 +44,4 @@ eval:
 	$(PY) -m braintumorseg.cli eval --config $(CONFIG)
 
 report:
-	$(PY) -m braintumorseg.cli report --config $(CONFIG)
+	$(PY) scripts/report.py --config $(CONFIG)
