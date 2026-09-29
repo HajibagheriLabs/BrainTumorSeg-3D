@@ -19,12 +19,11 @@ KEYS = ("image", "label")
 
 
 def _load(device: torch.device) -> list:
-    # cropping and normalisation happened once in preprocessing, so reading the cached
-    # arrays is the only per-sample cpu work; casts and augmentation run on the device
+    # cropping and normalisation happened once in preprocessing; these steps are
+    # deterministic, so a CacheDataset keeps their float16 output resident on the device
     return [
         LoadImaged(keys=KEYS, reader="NumpyReader", dtype=None, image_only=True),
         EnsureTyped(keys=KEYS, device=device, track_meta=False),
-        CastToTyped(keys=KEYS, dtype=(torch.float32, torch.uint8)),
     ]
 
 
@@ -40,6 +39,8 @@ def train_transforms(cfg: Config, device: torch.device) -> Compose:
             neg=1.0 - cfg.train.foreground_crop_prob,
             num_samples=1,
         ),
+        # cast the patch, not the cached volume, so the cache stays float16
+        CastToTyped(keys=KEYS, dtype=(torch.float32, torch.uint8)),
     ]
     aug = cfg.augment
     if aug.enabled:
