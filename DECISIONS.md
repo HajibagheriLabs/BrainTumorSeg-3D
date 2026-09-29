@@ -145,3 +145,42 @@ identical image is Dice 0.933 (WT), 0.915 (TC) and 0.883 (ET), with HD95 of 3.46
 2.24 mm. The worst pairs fall to Dice 0.36 (TC) and 0.43 (ET). Model scores near these medians are
 at the label-noise floor. A per-case difference smaller than this spread is not evidence that one
 model is better than another.
+
+## Training data lives on the GPU
+
+MONAI's U-Net downsamples at its first layer, so a 128³ training step is cheap. Streaming cases from
+disk would then make the CPU the bottleneck. The cropped float16 training and validation volumes fit
+in the RTX 3090's 24 GB next to the model, so a `CacheDataset` loads them once and keeps them on the
+GPU. Every random crop, flip and intensity jitter runs there, and the CPU only launches kernels.
+The cast to float32 happens on the cropped patch, not the cached volume, which keeps the cache at
+half size. On a smaller GPU, set `runtime.cache_on_device: false` to load each case per sample
+instead.
+
+## Output, loss and optimisation
+
+- The network predicts the four MSD labels with a softmax, and the evaluation regions are formed
+  from the predicted label map. Predicting the overlapping regions directly with sigmoids is a
+  common alternative; it is left for the ablations to test, not assumed.
+- The loss is Dice + cross-entropy. The Dice term ignores the background class, which fills most
+  of every patch. It is computed over the batch rather than per patch, so a class missing from one
+  patch does not produce an unstable 0/0 term.
+- Half of the training patches are centred on tumour, so small lesions are sampled often enough to
+  be learned.
+- AdamW with a cosine schedule to zero. Mixed precision is float16 with a gradient scaler, which
+  works on any CUDA GPU, where bfloat16 would need Ampere or newer.
+
+## Model selection and what "best" means
+
+The checkpoint kept is the one with the highest mean over regions of the per-case mean validation
+Dice, checked every 5 epochs on the 56 unique validation scans. HD95 is too slow to recompute every
+5 epochs, so it is measured once, on the selected checkpoint. The test split is not touched: the
+command line refuses any evaluation split other than `val` until the configuration is frozen.
+
+## Seeded, but not bitwise reproducible
+
+Python, NumPy, PyTorch, the MONAI transform chain and the data loader order are all seeded from
+the config. cuDNN autotuning stays on, and some GPU kernels are non-deterministic, so two runs of
+the same config agree closely but not bit for bit. Forcing deterministic kernels would slow
+training for a guarantee that no reported number depends on. Each MLflow run records the config,
+seed, git commit, whether the tree was dirty, the GPU and the run directory. A run interrupted
+mid-way resumes from its last checkpoint when `make train` is rerun.
