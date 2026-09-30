@@ -10,6 +10,7 @@ data:
     train: 0.70
     val: 0.15
     test: 0.15
+    seed: 42
   # msd has no patient ids but repeats patients across case ids; cases whose
   # atlas-space thumbnails are this similar are treated as one patient, see DECISIONS.md
   link:

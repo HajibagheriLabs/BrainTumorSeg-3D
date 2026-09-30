@@ -1,6 +1,5 @@
 """Dataset parsing, patient-level splits and per-case normalisation."""
 
-import dataclasses
 import json
 import os
 import random
@@ -311,11 +310,12 @@ def build_splits(cfg: Config, index: DatasetIndex, device: torch.device) -> dict
     for meta in metas:
         volumes = region_voxels(meta, index, cfg.data.regions)
         strata[meta["case_id"]] = ",".join(r for r, n in volumes.items() if n == 0)
-    splits = make_splits(groups, strata, cfg.data.split, cfg.seed)
+    split = cfg.data.split
+    splits = make_splits(groups, strata, split, split.seed)
     identical = torch.triu(similarity >= cfg.data.link.duplicate_threshold, diagonal=1)
     return {
-        "seed": cfg.seed,
-        "fractions": dataclasses.asdict(cfg.data.split),
+        "seed": split.seed,
+        "fractions": {"train": split.train, "val": split.val, "test": split.test},
         "link_threshold": cfg.data.link.threshold,
         "linked_groups": [list(group) for group in groups if len(group) > 1],
         "exact_duplicates": [

@@ -65,7 +65,7 @@ def naive_leakage(
     """Per held-out split of a case-level split: (cases with a same-patient scan in train, size)."""
     singletons = [(case_id,) for case_id in case_ids]
     naive = make_splits(
-        singletons, dict.fromkeys(case_ids, ""), cfg.data.split, cfg.seed
+        singletons, dict.fromkeys(case_ids, ""), cfg.data.split, cfg.data.split.seed
     )
     train = set(naive["train"])
     group_of = {

@@ -30,8 +30,11 @@ class SplitConfig:
     train: float
     val: float
     test: float
+    # separate from the training seed, so a seed ablation can never move the split
+    seed: int
 
     def __post_init__(self) -> None:
+        _require(self.seed >= 0, "data.split.seed must be non-negative")
         parts = (self.train, self.val, self.test)
         _require(
             all(0.0 < p < 1.0 for p in parts),
