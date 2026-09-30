@@ -173,8 +173,8 @@ instead.
 
 The checkpoint kept is the one with the highest mean over regions of the per-case mean validation
 Dice, checked every 5 epochs on the 56 unique validation scans. HD95 is too slow to recompute every
-5 epochs, so it is measured once, on the selected checkpoint. The test split is not touched: the
-command line refuses any evaluation split other than `val` until the configuration is frozen.
+5 epochs, so it is measured once, on the selected checkpoint. The test split plays no part in
+selection.
 
 ## Seeded, but not bitwise reproducible
 
@@ -256,3 +256,33 @@ resolving them needs several seeds per config.
 The configuration carried forward to the test split is therefore the baseline. No ablation earned
 a change, and choosing the numerically highest one would be selecting on noise at more than four
 times the training cost.
+
+## The test evaluation: one configuration, one forward pass
+
+The test split is scored with the baseline, `configs/unet3d.yaml`, and its epoch-275 checkpoint.
+The config names that configuration in `data.frozen_config`, and the command line refuses
+`--split test` for any other config, so an ablation cannot be scored on test by accident. A test
+enforces the refusal. The key, the evaluation code and the failure analysis below were all
+committed before the test split was scored.
+
+`make eval SPLIT=test` stores the predicted label map of every scan next to the scores. The
+tables, figures and failure analysis read those stored predictions, so the model runs over the
+test scans exactly once.
+
+## Failure analysis: what is measured
+
+`scripts/failure_analysis.py` was written and run on the validation split first. What it measures
+was therefore fixed before any test score existed:
+
+- **Ranking.** Scans are ordered by mean Dice over the regions present in the ground truth. The
+  worst five and the best five are drawn at the axial slice where prediction and truth disagree
+  on the most voxels, which shows the error instead of the most flattering slice.
+- **Small lesions.** The Spearman correlation between Dice and true region volume, with a
+  bootstrap 95% interval over scans (10,000 resamples), and Dice within quartiles of volume.
+- **How much of that is the metric.** A boundary error of fixed width costs more Dice on a small
+  object, so some dependence on volume is built into Dice. The same correlation is computed for
+  the two annotations of each duplicated scan, as the dependence a second human reader shows.
+- **Label confusion.** A voxel confusion matrix between true and predicted labels, pooled over
+  scans, next to the same matrix between the two annotations of the duplicated scans.
+- **Error volumes.** Missed and extra volume per region, the volume of predicted tumour
+  components that touch no true tumour, and of true components the prediction does not touch.

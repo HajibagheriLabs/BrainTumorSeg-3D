@@ -180,13 +180,14 @@ make report
 `make train` trains the config (default `configs/unet3d.yaml`, or pass `CONFIG=...`) into
 `runs/<name>/`. It keeps the checkpoint with the best validation Dice, and rerunning it resumes an
 interrupted run. On an RTX 3090 the baseline takes about an hour. `make eval` scores that
-checkpoint on the validation split with the full metrics; the command line refuses the test
-split until the configuration is frozen. `make ablate` trains and scores every config in
-`configs/ablations/`, each of which changes one setting of the baseline; it takes about ten
+checkpoint on the validation split with the full metrics and stores the predicted label maps.
+`make eval SPLIT=test` does the same on the test split, and only for the configuration named in
+`data.frozen_config`; every other config is refused. `make ablate` trains and scores every config
+in `configs/ablations/`, each of which changes one setting of the baseline; it takes about ten
 hours in total and skips runs that are already finished. `make report` writes the tables and
-figures in `reports/`, and needs the baseline and all ablations to have been evaluated. Every run
-is logged to a local MLflow store in `mlruns/`, including the config, seed, per-epoch metrics, git
-commit and run directory. To browse it:
+figures in `reports/`, and needs the baseline to have been evaluated on both splits and all
+ablations on validation. Every run is logged to a local MLflow store in `mlruns/`, including the
+config, seed, per-epoch metrics, git commit and run directory. To browse it:
 
 ```bash
 .venv/Scripts/mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db
