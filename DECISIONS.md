@@ -1,6 +1,17 @@
 # Decisions
 
-A short log of every non-obvious choice and the reason for it. Newest entries at the bottom.
+A short log of every non-obvious choice and the reason for it. Entries are in the order the
+choices were made. The ones a reader is most likely to look for:
+
+| question | entry |
+|---|---|
+| How are patients kept out of more than one split? | [Patient identity](#patient-identity-repeat-scans-are-linked-before-splitting), [Split strategy](#split-strategy) |
+| What happens when a region is absent from the ground truth? | [Empty ground truth](#empty-ground-truth) |
+| Why Dice + cross-entropy? | [Output, loss and optimisation](#output-loss-and-optimisation) |
+| Why 128³ patches? | [Patch size](#patch-size) |
+| Why report HD95 next to Dice? | [Why HD95 is reported next to Dice](#why-hd95-is-reported-next-to-dice) |
+| What did the ablations change? | [Ablations: what mattered and what did not](#ablations-what-mattered-and-what-did-not) |
+| How was the test split protected? | [The test evaluation](#the-test-evaluation-one-configuration-one-forward-pass) |
 
 ## Dataset: MSD Task01_BrainTumour rather than raw BraTS
 
@@ -160,10 +171,13 @@ instead.
 
 - The network predicts the four MSD labels with a softmax, and the evaluation regions are formed
   from the predicted label map. Predicting the overlapping regions directly with sigmoids is a
-  common alternative; it is left for the ablations to test, not assumed.
-- The loss is Dice + cross-entropy. The Dice term ignores the background class, which fills most
-  of every patch. It is computed over the batch rather than per patch, so a class missing from one
-  patch does not produce an unstable 0/0 term.
+  common alternative. It was not tried here.
+- The loss is Dice + cross-entropy, the common default for this task. Dice optimises the overlap
+  the evaluation measures and is not swamped by the background. Cross-entropy adds a per-voxel
+  gradient that is steadier for small structures. The Dice term ignores the background class,
+  which fills most of every patch. It is computed over the batch rather than per patch, so a
+  class missing from one patch does not produce an unstable 0/0 term. The ablations later found
+  no detectable difference from Dice alone or Dice + focal, so the choice stood.
 - Half of the training patches are centred on tumour, so small lesions are sampled often enough to
   be learned.
 - AdamW with a cosine schedule to zero. Mixed precision is float16 with a gradient scaler, which
@@ -306,3 +320,40 @@ score, and the tables committed before and after are both in the history:
   existed.
 
 What the analysis found is in `reports/failure_analysis.md`.
+
+## Patch size
+
+Training uses 128³ patches. After cropping to the brain, the 484 cases measure 119–187 voxels per
+axis, with a median of 138 x 169 x 138 (`reports/dataset_stats.csv`). A 128³ patch therefore
+holds most of a brain, so the network sees a tumour together with its surroundings, and at
+inference two windows per axis cover the whole volume. The size also has to be divisible by 16,
+the product of the network's strides, and at batch size 2 with mixed precision it fits in 24 GB
+next to the cached training data.
+
+The ablation with 96³ patches found no detectable difference against the baseline (mean Dice
+-0.002, +0.002 and -0.003 for WT, TC and ET) and trains in 0.70 hours against 1.09. Against the
+reseeded baseline it is lower on all three regions, by 0.009 on WT with an interval excluding
+zero, which is a hint and no more. 128³ was kept because nothing argued for changing it, not
+because it was shown to be better. On a smaller GPU, 96³ is a reasonable choice.
+
+## Why HD95 is reported next to Dice
+
+Dice counts overlapping volume. It cannot tell where an error is, and it depends on the size of
+the object. HD95 measures how far the two surfaces are apart, in millimetres. The test split shows
+both reasons for reporting it (`reports/failure_analysis.md`):
+
+- **Dice forgives a detached false positive.** BRATS_392 scores a whole-tumour Dice of 0.94 and
+  an HD95 of 48.8 mm, because 2.4 mL of tumour is predicted far from the real one. Of the ten
+  test scans with a whole-tumour HD95 above 20 mm, nine contain a whole component that is
+  predicted where there is no tumour, or a true one the prediction does not touch.
+- **Dice punishes small objects for the same boundary error.** Whole-tumour Dice correlates with
+  tumour volume at 0.46 on the test split. HD95 shows no detectable dependence on volume there
+  (-0.19, interval -0.44 to 0.09).
+
+The 95th percentile is used instead of the maximum because a single stray voxel sets the maximum,
+and the ground truth itself contains isolated fragments.
+
+HD95 has its own weakness: a missed region has no surface to measure from. The convention in
+[Empty ground truth](#empty-ground-truth) charges it the scan diagonal, 373.13 mm, which then
+dominates the mean. For HD95 the median and quartiles are the figures to read, and the mean is
+reported so that the misses stay visible.
