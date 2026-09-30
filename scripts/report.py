@@ -1,4 +1,4 @@
-"""Validation tables and figures for one trained config, written to reports/."""
+"""Tables and figures for one scored split of a trained config, written to reports/."""
 
 import argparse
 from pathlib import Path
@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from braintumorseg.cli import EVAL_SPLITS
 from braintumorseg.config import load_config
 from braintumorseg.train import run_dir
 
@@ -26,6 +27,7 @@ METRIC_LABELS = {
     "hd95": "HD95 in mm (lower is better)",
 }
 HD95_TICKS = (0, 1, 2, 5, 10, 20, 50, 100, 200, 400)
+SPLIT_NAMES = {"val": "validation", "test": "test"}
 
 
 def _style(ax: plt.Axes) -> None:
@@ -43,6 +45,7 @@ def boxplot_figure(
     cases: pd.DataFrame,
     reference: pd.DataFrame,
     regions: list[str],
+    split_name: str,
     title: str,
     path: Path,
 ) -> None:
@@ -96,7 +99,7 @@ def boxplot_figure(
     fig.text(
         0.01,
         0.005,
-        f"One point per validation scan ({counts}). Dotted line: median agreement between "
+        f"One point per {split_name} scan ({counts}). Dotted line: median agreement between "
         "two annotations of the same scan.\nA region the model misses entirely scores the "
         "scan diagonal (373 mm here) as its HD95.",
         color=INK_SECONDARY,
@@ -157,36 +160,44 @@ def curve_figure(
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=Path, required=True)
+    parser.add_argument("--split", choices=EVAL_SPLITS, default="val")
     parser.add_argument("--prefix", default="baseline")
     parser.add_argument("--out", type=Path, default=Path("reports"))
     args = parser.parse_args()
     cfg = load_config(args.config)
-    run = run_dir(cfg)
+    run, split = run_dir(cfg), args.split
     regions = list(cfg.data.regions)
-    cases = pd.read_csv(run / "val_cases.csv")
-    summary = pd.read_csv(run / "val_summary.csv")
-    history = pd.read_csv(run / "history.csv")
+    cases = pd.read_csv(run / f"{split}_cases.csv")
+    summary = pd.read_csv(run / f"{split}_summary.csv")
     reference = pd.read_csv(args.out / "annotation_agreement_summary.csv")
+    # only one configuration is ever scored on test, so its files need no run prefix
+    validating = split == "val"
+    results = f"{args.prefix}_results.csv" if validating else "test_results.csv"
+    stem = f"{args.prefix}_val" if validating else "test"
 
     options = {"index": False, "lineterminator": "\n", "float_format": "%.6g"}
-    summary.to_csv(args.out / f"{args.prefix}_results.csv", **options)
-    cases.to_csv(args.out / f"{args.prefix}_val_cases.csv", **options)
-    history.to_csv(args.out / f"{args.prefix}_history.csv", **options)
+    summary.to_csv(args.out / results, **options)
+    cases.to_csv(args.out / f"{stem}_cases.csv", **options)
     figures = args.out / "figures"
     figures.mkdir(parents=True, exist_ok=True)
     boxplot_figure(
         cases,
         reference,
         regions,
-        f"{cfg.name}: per-case validation scores",
-        figures / f"{args.prefix}_val_boxplot.png",
+        SPLIT_NAMES[split],
+        f"{cfg.name}: per-case {SPLIT_NAMES[split]} scores",
+        figures / f"{stem}_boxplot.png",
     )
-    curve_figure(
-        history,
-        regions,
-        f"{cfg.name}: training loss and validation Dice",
-        figures / f"{args.prefix}_training_curve.png",
-    )
+    # the training curve belongs to the run, not to a split, so it is drawn once
+    if validating:
+        history = pd.read_csv(run / "history.csv")
+        history.to_csv(args.out / f"{args.prefix}_history.csv", **options)
+        curve_figure(
+            history,
+            regions,
+            f"{cfg.name}: training loss and validation Dice",
+            figures / f"{args.prefix}_training_curve.png",
+        )
     print(summary.to_string(index=False))
 
 
