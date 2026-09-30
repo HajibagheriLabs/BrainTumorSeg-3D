@@ -12,6 +12,7 @@ ABLATIONS = \
   configs/ablations/loss_dice_focal.yaml \
   configs/ablations/seed_43.yaml \
   configs/ablations/attention_unet.yaml
+NOISE_REFERENCE = configs/ablations/seed_43.yaml
 
 ifeq ($(OS),Windows_NT)
 PY := .venv/Scripts/python.exe
@@ -62,3 +63,5 @@ ablate:
 
 report:
 	$(PY) scripts/report.py --config $(CONFIG)
+	$(PY) scripts/report_ablations.py --baseline $(CONFIG) \
+	    --noise-reference $(NOISE_REFERENCE) $(ABLATIONS)
