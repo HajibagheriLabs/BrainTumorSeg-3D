@@ -269,6 +269,11 @@ committed before the test split was scored.
 tables, figures and failure analysis read those stored predictions, so the model runs over the
 test scans exactly once.
 
+That run has happened. The scores are in `reports/test_results.csv`, with one row per scan in
+`reports/test_cases.csv`. Nothing in the model, the configuration or the evaluation protocol was
+changed after they were seen. Two ideas the failures suggest, keeping only the largest predicted
+component and training harder on faint lesions, were left untried for that reason.
+
 ## Failure analysis: what is measured
 
 `scripts/failure_analysis.py` was written and run on the validation split first. What it measures
@@ -286,3 +291,18 @@ was therefore fixed before any test score existed:
   scans, next to the same matrix between the two annotations of the duplicated scans.
 - **Error volumes.** Missed and extra volume per region, the volume of predicted tumour
   components that touch no true tumour, and of true components the prediction does not touch.
+
+Three things were added to the script after the test results were seen. None of them changes a
+score, and the tables committed before and after are both in the history:
+
+- **Lesion intensity.** The two worst test scans are not small lesions, so volume could not
+  explain them. The mean normalised intensity of each sequence inside each true region was added
+  as a second quantity to correlate the scores with. It was chosen with the failures in view,
+  which is how a false pattern gets found. So all twelve region and sequence pairs are reported,
+  not only the ones that correlate, and the same tables are written for the validation split,
+  which played no part in the choice. Only what holds on both splits is claimed.
+- **A partial correlation with volume held fixed**, because small lesions are also fainter.
+- **The share of lost Dice per volume quartile**, a column derived from a table that already
+  existed.
+
+What the analysis found is in `reports/failure_analysis.md`.
