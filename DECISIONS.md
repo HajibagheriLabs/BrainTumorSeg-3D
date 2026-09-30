@@ -197,3 +197,62 @@ The best checkpoint is from epoch 275.
 The baseline run was interrupted once after epoch 9 and resumed from its epoch-5 checkpoint, so
 epochs 6–9 were retrained. Its MLflow record names the one uncommitted path at launch,
 `DECISIONS.md`; the code was exactly the recorded commit.
+
+## Ablations: how they were run and judged
+
+Each ablation is a config in `configs/ablations/` that extends the baseline and states one change.
+Nothing in the source differs between runs, and a test checks that every config loads and keeps
+the same split. All are trained for the same 300 epochs and scored on the same 56 validation scans
+with their best-validation checkpoint. `reports/ablations.csv` holds the comparison,
+`reports/results.csv` the full distributions and `reports/figures/ablations.png` the figure.
+
+Differences are judged per scan, with a paired bootstrap (10,000 resamples, 95% interval) on mean
+Dice and median HD95. That interval covers which scans happened to be in the validation split. It
+does not cover training randomness, so the baseline was also retrained with another training seed
+(the split has its own seed and does not move). The two baseline runs differ from each other by
++0.0065 mean Dice on WT [+0.0011, +0.0131] and +0.0147 on TC [+0.0012, +0.0307], both intervals
+excluding zero. Judged by the bootstrap alone, the baseline "beats itself".
+
+The rule is therefore: an ablation is better or worse only if its interval excludes zero against
+both baseline runs, on the same side. The first version of the rule compared against one baseline
+run and required the change to exceed the seed-to-seed difference. It flagged three cells as
+better: Dice-only loss on TC (+0.0178) and Attention U-Net on WT (+0.0099) and TC (+0.0182).
+Against the reseeded baseline the same three are +0.0031, +0.0034 and +0.0035, with intervals
+spanning zero. The rule was tightened after seeing that, in the direction of claiming less.
+
+## Ablations: what mattered and what did not
+
+Nothing mattered. No ablation is better or worse than the baseline on any region, for Dice or
+HD95. Of the 24 Dice cells, 7 differ from one baseline run but not the other and 17 differ from
+neither. Median HD95 shows no detectable difference in any cell.
+
+- **Loss (Dice, Dice + focal, against Dice + cross-entropy): no difference.** Dice-only is the
+  case above: +0.018 on TC against one baseline run, +0.003 against the other. On WT it points
+  the other way, -0.0004 and -0.007, the second with an interval excluding zero. Dice + focal
+  differs from neither run on any region.
+- **Patch size 96³ against 128³: no difference.** Mean Dice moves by -0.002, +0.002 and -0.003
+  (WT, TC, ET) against the baseline, all intervals spanning zero. Against the reseeded run it is
+  lower on all three, and the WT interval (-0.009) excludes zero. It trains in 0.70 hours against
+  1.09.
+- **Attention U-Net against the plain U-Net: no difference that survives the seed.** It has the
+  highest mean Dice on every region (0.899, 0.824, 0.755), but against the reseeded baseline the
+  gains are +0.003, +0.003 and +0.004. It takes 4.82 hours to train against 1.09.
+- **Augmentation off: no difference that survives the seed.** Mean Dice is lower in all six
+  comparisons, by -0.004, -0.004 and -0.001 against the baseline and by -0.011, -0.019 and -0.006
+  against the reseeded one. Only the WT and TC intervals against the reseeded run exclude zero.
+  That is consistent with augmentation helping a little, and not enough to say so.
+- **Sliding-window overlap: inert at this patch size.** Overlap 0, 0.25 and 0.5 give identical
+  scores, not just similar ones. The validation crops are 119–187 voxels per axis against a
+  128-voxel window, so any overlap up to 0.5 places the same two windows per axis, one at each
+  end. Overlap 0.75 adds windows and changes mean Dice by +0.0003 to +0.0005, intervals spanning
+  zero.
+
+These negative results are the finding. A single-seed comparison would have reported that
+Dice-only loss and Attention U-Net improve tumour core by 0.018, with a bootstrap interval to
+back it. Both claims disappear when the baseline is retrained. With one run per ablation, two of
+the baseline and 56 scans, this design cannot resolve effects below about 0.01–0.02 mean Dice;
+resolving them needs several seeds per config.
+
+The configuration carried forward to the test split is therefore the baseline. No ablation earned
+a change, and choosing the numerically highest one would be selecting on noise at more than four
+times the training cost.

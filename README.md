@@ -52,6 +52,42 @@ none there.
 
 ![Training loss and validation Dice per epoch](reports/figures/baseline_training_curve.png)
 
+### Ablations
+
+Each ablation changes one setting of the baseline and is scored on the same 56 validation scans
+([`reports/ablations.csv`](reports/ablations.csv), full distributions in
+[`reports/results.csv`](reports/results.csv)). The table gives mean Dice.
+
+| change | WT | TC | ET | training | verdict |
+|---|---:|---:|---:|---:|---|
+| baseline | 0.889 | 0.806 | 0.745 | 1.09 h | |
+| baseline, another training seed | 0.896 | 0.821 | 0.751 | 1.04 h | the seed-to-seed spread |
+| loss: Dice only | 0.889 | 0.824 | 0.746 | 1.04 h | not robust to the baseline seed |
+| loss: Dice + focal | 0.890 | 0.816 | 0.748 | 1.11 h | no detectable difference |
+| patch 96³ | 0.887 | 0.808 | 0.743 | 0.70 h | not robust to the baseline seed |
+| Attention U-Net | 0.899 | 0.824 | 0.755 | 4.82 h | not robust to the baseline seed |
+| augmentation off | 0.885 | 0.802 | 0.744 | 1.01 h | not robust to the baseline seed |
+| overlap 0 or 0.25 | 0.889 | 0.806 | 0.745 | none | identical to the baseline |
+| overlap 0.75 | 0.890 | 0.806 | 0.746 | none | no detectable difference |
+
+**No ablation is better or worse than the baseline.** A change counts only if its paired
+bootstrap interval excludes zero against both baseline runs, on the same side, and none does.
+
+- **Retraining the baseline moves the score as much as any ablation.** With only the training
+  seed changed, mean Dice moves by +0.007 (WT) and +0.015 (TC), and a bootstrap over scans calls
+  both differences real. The interval covers which scans were sampled, not how training went.
+- **A single-seed study would have reported two wins.** Dice-only loss and Attention U-Net each
+  gain 0.018 on TC against the baseline, with intervals excluding zero. Against the reseeded
+  baseline the gains are 0.003, and Attention U-Net costs more than four times the training.
+- **Overlap is inert here.** The brain crops are barely larger than the 128-voxel window, so
+  overlap 0, 0.25 and 0.5 place the same windows and give identical scores.
+- **The baseline is the configuration carried forward to the test split.**
+
+"Not robust to the baseline seed" means the change differs from one baseline run but not the
+other on at least one region. The full account is in [`DECISIONS.md`](DECISIONS.md).
+
+![Each ablation against both baseline runs](reports/figures/ablations.png)
+
 ## Data
 
 484 labelled cases from MSD Task01_BrainTumour (BraTS-derived), each a co-registered 240 x 240 x 155
@@ -137,6 +173,7 @@ if they disagree.
 ```bash
 make train
 make eval
+make ablate
 make report
 ```
 
@@ -144,9 +181,12 @@ make report
 `runs/<name>/`. It keeps the checkpoint with the best validation Dice, and rerunning it resumes an
 interrupted run. On an RTX 3090 the baseline takes about an hour. `make eval` scores that
 checkpoint on the validation split with the full metrics; the command line refuses the test
-split until the configuration is frozen. `make report` writes the tables and figures in
-`reports/`. Every run is logged to a local MLflow store in `mlruns/`, including the config, seed,
-per-epoch metrics, git commit and run directory. To browse it:
+split until the configuration is frozen. `make ablate` trains and scores every config in
+`configs/ablations/`, each of which changes one setting of the baseline; it takes about ten
+hours in total and skips runs that are already finished. `make report` writes the tables and
+figures in `reports/`, and needs the baseline and all ablations to have been evaluated. Every run
+is logged to a local MLflow store in `mlruns/`, including the config, seed, per-epoch metrics, git
+commit and run directory. To browse it:
 
 ```bash
 .venv/Scripts/mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db
