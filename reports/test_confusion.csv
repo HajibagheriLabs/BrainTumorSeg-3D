@@ -1,0 +1,33 @@
+source,truth,predicted,voxels,share_of_truth
+model,background,background,163819639,0.997554
+model,background,edema,361441,0.00220094
+model,background,non-enhancing tumor,16757,0.000102039
+model,background,enhancing tumour,23492,0.000143051
+model,edema,background,464272,0.148191
+model,edema,edema,2491014,0.795108
+model,edema,non-enhancing tumor,131742,0.0420508
+model,edema,enhancing tumour,45897,0.0146499
+model,non-enhancing tumor,background,54222,0.0553204
+model,non-enhancing tumor,edema,130702,0.13335
+model,non-enhancing tumor,non-enhancing tumor,649035,0.662183
+model,non-enhancing tumor,enhancing tumour,146185,0.149146
+model,enhancing tumour,background,47984,0.0418138
+model,enhancing tumour,edema,53064,0.0462406
+model,enhancing tumour,non-enhancing tumor,83777,0.0730043
+model,enhancing tumour,enhancing tumour,962738,0.838941
+annotators,background,background,1004303277,0.99906
+annotators,background,edema,851017,0.000846574
+annotators,background,non-enhancing tumor,56545,5.62498e-05
+annotators,background,enhancing tumour,37168,3.6974e-05
+annotators,edema,background,594478,0.0811593
+annotators,edema,edema,6310872,0.861572
+annotators,edema,non-enhancing tumor,354806,0.0484388
+annotators,edema,enhancing tumour,64676,0.00882969
+annotators,non-enhancing tumor,background,30395,0.0164065
+annotators,non-enhancing tumor,edema,202962,0.109554
+annotators,non-enhancing tumor,non-enhancing tumor,1402209,0.75688
+annotators,non-enhancing tumor,enhancing tumour,217051,0.117159
+annotators,enhancing tumour,background,49025,0.0145624
+annotators,enhancing tumour,edema,177065,0.0525955
+annotators,enhancing tumour,non-enhancing tumor,261949,0.0778095
+annotators,enhancing tumour,enhancing tumour,2878505,0.855033
