@@ -26,8 +26,9 @@ NOISE_BAND = "#e1e0d9"
 REGION_COLOURS = ("#2a78d6", "#eb6834", "#1baf7a")
 BOOTSTRAP_SAMPLES = 10_000
 CONFIDENCE = 0.95
-# settings that name a run rather than change what it does
+# settings that name a run or say how it executes, rather than change what it computes
 IDENTITY_KEYS = {"name", "inference.checkpoint_run"}
+EXECUTION_PREFIX = "runtime."
 # (column prefix, statistic, direction in which a change is an improvement)
 COMPARISONS = (("dice_mean", np.mean, 1.0), ("hd95_median", np.median, -1.0))
 
@@ -36,7 +37,11 @@ def changed_settings(cfg: Config, baseline: Config) -> str:
     flat = flatten_config(dataclasses.asdict(cfg))
     base = flatten_config(dataclasses.asdict(baseline))
     changes = [
-        f"{k}={v}" for k, v in flat.items() if v != base[k] and k not in IDENTITY_KEYS
+        f"{key}={value}"
+        for key, value in flat.items()
+        if value != base[key]
+        and key not in IDENTITY_KEYS
+        and not key.startswith(EXECUTION_PREFIX)
     ]
     return ", ".join(changes) or "baseline"
 

@@ -2,3 +2,7 @@ extends: ../unet3d.yaml
 name: ablation_attention_unet
 model:
   architecture: attention_unet
+# execution only: this network's activations need the gpu memory the data cache would
+# otherwise hold, so its cases are read from disk per sample instead
+runtime:
+  cache_on_device: false
