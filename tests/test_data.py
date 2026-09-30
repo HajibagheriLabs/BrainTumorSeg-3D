@@ -3,8 +3,10 @@ from itertools import combinations
 from pathlib import Path
 
 import numpy as np
+import pytest
 import torch
 
+from braintumorseg.cli import main
 from braintumorseg.config import load_config
 from braintumorseg.data import (
     SPLITS,
@@ -40,6 +42,16 @@ def test_committed_splits_share_no_patient() -> None:
         scored = evaluation_cases(splits, name)
         assert not superseded & set(scored)
         assert len(scored) == len(splits[name]) - len(superseded & members[name])
+
+
+def test_test_split_is_refused_for_every_config_but_the_frozen_one() -> None:
+    frozen = load_config(BASELINE)
+    assert frozen.data.frozen_config == frozen.name
+    ablations = sorted((REPO / "configs" / "ablations").glob("*.yaml"))
+    assert ablations
+    for path in ablations:
+        with pytest.raises(SystemExit, match=f"scored only with {frozen.name}"):
+            main(["eval", "--config", str(path), "--split", "test"])
 
 
 def test_split_is_deterministic_under_fixed_seed() -> None:

@@ -6,6 +6,8 @@ data:
   root: data/raw/Task01_BrainTumour
   processed_dir: data/processed
   splits_file: configs/splits.json
+  # the only configuration the test split is scored with, named before that evaluation
+  frozen_config: unet3d_baseline
   split:
     train: 0.70
     val: 0.15

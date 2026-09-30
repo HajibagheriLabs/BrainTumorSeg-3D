@@ -67,11 +67,13 @@ class DataConfig:
     root: Path
     processed_dir: Path
     splits_file: Path
+    frozen_config: str
     split: SplitConfig
     link: LinkConfig
     regions: dict[str, tuple[int, ...]]
 
     def __post_init__(self) -> None:
+        _require(bool(self.frozen_config), "data.frozen_config must be non-empty")
         _require(bool(self.regions), "data.regions must define at least one region")
         for name, labels in self.regions.items():
             distinct = len(labels) > 0 and len(set(labels)) == len(labels)

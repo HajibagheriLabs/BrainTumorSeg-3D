@@ -1,4 +1,6 @@
 CONFIG ?= configs/unet3d.yaml
+# val while anything is still being chosen; test once, for the frozen configuration
+SPLIT ?= val
 # cu126 is the cuda 12.x build of the pinned torch; use cpu for a machine without an nvidia gpu
 TORCH_BACKEND ?= cu126
 # inference-only runs first and the slowest architecture last, so partial results come early
@@ -55,7 +57,7 @@ train:
 	$(PY) -m braintumorseg.cli train --config $(CONFIG)
 
 eval:
-	$(PY) -m braintumorseg.cli eval --config $(CONFIG)
+	$(PY) -m braintumorseg.cli eval --config $(CONFIG) --split $(SPLIT)
 
 # one target per ablation keeps every recipe a plain command, so it runs under sh and cmd alike
 ablate: $(ABLATION_RUNS)

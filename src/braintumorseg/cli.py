@@ -26,8 +26,7 @@ from braintumorseg.train import (
 )
 
 COMMANDS = ("data", "train", "eval")
-# the test split is scored once, after the configuration is frozen; until then only val
-EVAL_SPLITS = ("val",)
+EVAL_SPLITS = ("val", "test")
 
 
 def runtime_device(cfg: Config) -> torch.device:
@@ -48,6 +47,12 @@ def run_data(cfg: Config) -> None:
 
 
 def run_eval(cfg: Config, split: str) -> None:
+    # checked before anything is loaded, so no other configuration ever sees the test split
+    if split == "test" and cfg.name != cfg.data.frozen_config:
+        raise SystemExit(
+            f"the test split is scored only with {cfg.data.frozen_config}, the frozen "
+            f"configuration, not with {cfg.name}"
+        )
     device = runtime_device(cfg)
     model = load_best_model(cfg, device)
     case_ids = evaluation_cases(read_splits(cfg.data.splits_file), split)
