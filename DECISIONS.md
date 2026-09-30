@@ -194,6 +194,6 @@ mean validation Dice stays between 0.8115 and 0.8135 while the learning rate ann
 Longer training would buy at most a change of that order, well inside the case-to-case spread.
 The best checkpoint is from epoch 275.
 
-The baseline run was interrupted once, by the session that launched it ending after epoch 9. It
-resumed from the epoch-5 checkpoint, so epochs 6–9 were retrained. Its MLflow record names the one
-uncommitted path at launch, `DECISIONS.md`; the code was exactly the recorded commit.
+The baseline run was interrupted once after epoch 9 and resumed from its epoch-5 checkpoint, so
+epochs 6–9 were retrained. Its MLflow record names the one uncommitted path at launch,
+`DECISIONS.md`; the code was exactly the recorded commit.
