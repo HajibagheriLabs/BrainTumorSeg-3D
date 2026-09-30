@@ -50,12 +50,12 @@ def build_loss(name: str) -> nn.Module:
     return losses[name](**options)
 
 
-def _flatten(tree: dict, prefix: str = "") -> dict[str, str]:
+def flatten_config(tree: dict, prefix: str = "") -> dict[str, str]:
     flat = {}
     for key, value in tree.items():
         name = f"{prefix}{key}"
         if isinstance(value, dict):
-            flat |= _flatten(value, f"{name}.")
+            flat |= flatten_config(value, f"{name}.")
         else:
             flat[name] = str(value)
     return flat
@@ -124,8 +124,23 @@ def validation_dice(
     return {region: float(np.nanmean(values)) for region, values in scores.items()}
 
 
+def record_identity(cfg: Config, device: torch.device) -> None:
+    """Log what defines a run to the active MLflow run and its directory, once per run."""
+    out = run_dir(cfg)
+    save_config(cfg, out / "config.yaml")
+    mlflow.log_params(flatten_config(dataclasses.asdict(cfg)))
+    on_gpu = device.type == "cuda"
+    hardware = torch.cuda.get_device_name(device) if on_gpu else device.type
+    tags = {"run_dir": str(out.resolve()), "device": hardware}
+    tags["checkpoint_run"] = cfg.inference.checkpoint_run or cfg.name
+    mlflow.set_tags(tags | _git_state())
+    mlflow.log_artifact(str(out / "config.yaml"))
+
+
 def load_best_model(cfg: Config, device: torch.device) -> nn.Module:
-    path = run_dir(cfg) / "best.pt"
+    path = (
+        cfg.runtime.output_dir / (cfg.inference.checkpoint_run or cfg.name) / "best.pt"
+    )
     if not path.exists():
         raise FileNotFoundError(f"{path} not found: train this config first")
     model = build_model(cfg.model).to(device)
@@ -138,6 +153,11 @@ def load_best_model(cfg: Config, device: torch.device) -> nn.Module:
 def train(cfg: Config, device: torch.device) -> Path:
     """Train with the config, resuming its run directory if one exists; returns that directory."""
     out = run_dir(cfg)
+    if cfg.inference.checkpoint_run is not None:
+        print(
+            f"{cfg.name} reuses the model of {cfg.inference.checkpoint_run}; nothing to train"
+        )
+        return out
     last = out / "last.pt"
     resume = (
         torch.load(last, map_location=device, weights_only=True)
@@ -198,13 +218,7 @@ def train(cfg: Config, device: torch.device) -> Path:
 
     with tracked_run(cfg):
         if resume is None:
-            save_config(cfg, out / "config.yaml")
-            mlflow.log_params(_flatten(dataclasses.asdict(cfg)))
-            hardware = torch.cuda.get_device_name(device) if amp else device.type
-            mlflow.set_tags(
-                {"run_dir": str(out.resolve()), "device": hardware} | _git_state()
-            )
-            mlflow.log_artifact(str(out / "config.yaml"))
+            record_identity(cfg, device)
 
         for epoch in range(start + 1, cfg.train.epochs + 1):
             began = time.perf_counter()

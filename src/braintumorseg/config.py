@@ -2,6 +2,7 @@
 
 import dataclasses
 import math
+import types
 import typing
 from dataclasses import dataclass
 from pathlib import Path
@@ -159,6 +160,9 @@ class InferenceConfig:
     sw_batch_size: int
     overlap: float
     blend_mode: str
+    # null scores this config's own checkpoint; a run name reuses that run's model, which
+    # lets inference-only ablations evaluate a trained model without retraining it
+    checkpoint_run: str | None
 
     def __post_init__(self) -> None:
         _require(self.sw_batch_size > 0, "inference.sw_batch_size must be positive")
@@ -212,6 +216,10 @@ class Config:
 def _coerce(value: Any, hint: Any, where: str) -> Any:
     if dataclasses.is_dataclass(hint):
         return _build(hint, value, where)
+    if isinstance(hint, types.UnionType):
+        options = [arg for arg in typing.get_args(hint) if arg is not type(None)]
+        _require(len(options) == 1, f"no config coercion for type {hint} at {where}")
+        return None if value is None else _coerce(value, options[0], where)
     if hint is Path:
         _require(
             isinstance(value, str) and value != "",

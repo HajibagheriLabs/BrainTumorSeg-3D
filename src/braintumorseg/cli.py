@@ -17,7 +17,13 @@ from braintumorseg.data import (
 )
 from braintumorseg.inference import evaluate_cases
 from braintumorseg.metrics import STATISTICS, summarise_cases
-from braintumorseg.train import load_best_model, run_dir, tracked_run, train
+from braintumorseg.train import (
+    load_best_model,
+    record_identity,
+    run_dir,
+    tracked_run,
+    train,
+)
 
 COMMANDS = ("data", "train", "eval")
 # the test split is scored once, after the configuration is frozen; until then only val
@@ -48,10 +54,14 @@ def run_eval(cfg: Config, split: str) -> None:
     rows = evaluate_cases(model, cfg, case_ids, device)
     summary = pd.DataFrame(summarise_cases(rows, list(cfg.data.regions)))
     out = run_dir(cfg)
+    out.mkdir(parents=True, exist_ok=True)
     options = {"index": False, "lineterminator": "\n", "float_format": "%.6g"}
     pd.DataFrame(rows).to_csv(out / f"{split}_cases.csv", **options)
     summary.to_csv(out / f"{split}_summary.csv", **options)
-    with tracked_run(cfg):
+    with tracked_run(cfg) as run:
+        # an inference-only ablation has no training run to describe it, so describe it here
+        if not run.data.params:
+            record_identity(cfg, device)
         for row in summary.to_dict("records"):
             prefix = f"{split}_{row['region']}_{row['metric']}"
             mlflow.log_metrics({f"{prefix}_{stat}": row[stat] for stat in STATISTICS})

@@ -57,6 +57,7 @@ inference:
   sw_batch_size: 4
   overlap: 0.5
   blend_mode: gaussian
+  checkpoint_run: null
 
 runtime:
   device: cuda
