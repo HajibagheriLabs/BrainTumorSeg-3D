@@ -13,6 +13,8 @@ ABLATIONS = \
   configs/ablations/seed_43.yaml \
   configs/ablations/attention_unet.yaml
 NOISE_REFERENCE = configs/ablations/seed_43.yaml
+ABLATION_RUNS = $(ABLATIONS:%=run-%)
+ABLATION_REPORT = scripts/report_ablations.py --baseline $(CONFIG) --noise-reference $(NOISE_REFERENCE)
 
 ifeq ($(OS),Windows_NT)
 PY := .venv/Scripts/python.exe
@@ -20,7 +22,7 @@ else
 PY := .venv/bin/python
 endif
 
-.PHONY: setup env test lint format data crosscheck train eval ablate report
+.PHONY: setup env test lint format data crosscheck train eval ablate report $(ABLATION_RUNS)
 
 setup:
 	uv venv --allow-existing --python 3.11 .venv
@@ -55,13 +57,13 @@ train:
 eval:
 	$(PY) -m braintumorseg.cli eval --config $(CONFIG)
 
-ablate:
-	for config in $(ABLATIONS); do \
-	    $(PY) -m braintumorseg.cli train --config $$config || exit 1; \
-	    $(PY) -m braintumorseg.cli eval --config $$config || exit 1; \
-	done
+# one target per ablation keeps every recipe a plain command, so it runs under sh and cmd alike
+ablate: $(ABLATION_RUNS)
+
+$(ABLATION_RUNS): run-%:
+	$(PY) -m braintumorseg.cli train --config $*
+	$(PY) -m braintumorseg.cli eval --config $*
 
 report:
 	$(PY) scripts/report.py --config $(CONFIG)
-	$(PY) scripts/report_ablations.py --baseline $(CONFIG) \
-	    --noise-reference $(NOISE_REFERENCE) $(ABLATIONS)
+	$(PY) $(ABLATION_REPORT) $(ABLATIONS)
