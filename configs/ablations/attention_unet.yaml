@@ -1,0 +1,4 @@
+extends: ../unet3d.yaml
+name: ablation_attention_unet
+model:
+  architecture: attention_unet

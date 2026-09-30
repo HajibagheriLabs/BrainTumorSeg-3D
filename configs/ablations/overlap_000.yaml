@@ -1,0 +1,6 @@
+# inference only: the baseline model scored with a different sliding-window overlap
+extends: ../unet3d.yaml
+name: ablation_overlap_000
+inference:
+  overlap: 0.0
+  checkpoint_run: unet3d_baseline

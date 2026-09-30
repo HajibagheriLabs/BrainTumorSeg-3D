@@ -1,0 +1,4 @@
+extends: ../unet3d.yaml
+name: ablation_loss_dice
+train:
+  loss: dice

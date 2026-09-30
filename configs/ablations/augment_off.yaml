@@ -1,0 +1,4 @@
+extends: ../unet3d.yaml
+name: ablation_augment_off
+augment:
+  enabled: false

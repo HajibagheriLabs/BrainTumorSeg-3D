@@ -1,0 +1,5 @@
+# the baseline retrained with another seed: the run-to-run noise every other ablation
+# has to beat before its difference means anything
+extends: ../unet3d.yaml
+name: ablation_seed_43
+seed: 43
