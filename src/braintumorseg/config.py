@@ -270,10 +270,31 @@ def _build(cls: type, raw: Any, where: str) -> Any:
     )
 
 
-def load_config(path: str | Path) -> Config:
-    with Path(path).open(encoding="utf-8") as handle:
+def _merge(base: dict, override: dict) -> dict:
+    merged = dict(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _merge(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def _read(path: Path, seen: tuple[Path, ...] = ()) -> dict:
+    path = path.resolve()
+    _require(path not in seen, f"config extends itself: {' -> '.join(map(str, seen))}")
+    with path.open(encoding="utf-8") as handle:
         raw = yaml.safe_load(handle)
-    return _build(Config, raw, "config")
+    _require(isinstance(raw, dict), f"{path} must hold a mapping")
+    parent = raw.pop("extends", None)
+    if parent is None:
+        return raw
+    # an ablation states only what it changes; everything else comes from its parent
+    return _merge(_read(path.parent / parent, (*seen, path)), raw)
+
+
+def load_config(path: str | Path) -> Config:
+    return _build(Config, _read(Path(path)), "config")
 
 
 def _plain(value: Any) -> Any:
