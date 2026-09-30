@@ -65,7 +65,11 @@ def test_two_training_steps_produce_a_checkpoint_that_evaluates(tmp_path: Path) 
 
     assert (out / "best.pt").exists() and (out / "config.yaml").exists()
     assert pd.read_csv(out / "history.csv")["steps"].tolist() == [2]
-    rows = evaluate_cases(load_best_model(cfg, cpu), cfg, ["case_2"], cpu)
+    predictions = tmp_path / "predictions"
+    model = load_best_model(cfg, cpu)
+    rows = evaluate_cases(model, cfg, ["case_2"], cpu, predictions)
     assert rows[0]["case_id"] == "case_2"
+    saved = np.load(predictions / "case_2.npy")
+    assert saved.shape == (1, *SHAPE) and saved.dtype == np.uint8
     scored = {f"{region}_{m}" for region in cfg.data.regions for m in ("dice", "hd95")}
     assert scored <= set(rows[0])

@@ -51,10 +51,9 @@ def run_eval(cfg: Config, split: str) -> None:
     device = runtime_device(cfg)
     model = load_best_model(cfg, device)
     case_ids = evaluation_cases(read_splits(cfg.data.splits_file), split)
-    rows = evaluate_cases(model, cfg, case_ids, device)
-    summary = pd.DataFrame(summarise_cases(rows, list(cfg.data.regions)))
     out = run_dir(cfg)
-    out.mkdir(parents=True, exist_ok=True)
+    rows = evaluate_cases(model, cfg, case_ids, device, out / f"{split}_predictions")
+    summary = pd.DataFrame(summarise_cases(rows, list(cfg.data.regions)))
     options = {"index": False, "lineterminator": "\n", "float_format": "%.6g"}
     pd.DataFrame(rows).to_csv(out / f"{split}_cases.csv", **options)
     summary.to_csv(out / f"{split}_summary.csv", **options)
