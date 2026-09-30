@@ -70,4 +70,5 @@ report:
 	$(PY) scripts/report.py --config $(CONFIG)
 	$(PY) $(ABLATION_REPORT) $(ABLATIONS)
 	$(PY) scripts/report.py --config $(CONFIG) --split test
+	$(PY) scripts/failure_analysis.py --config $(CONFIG) --split val --tables-only
 	$(PY) scripts/failure_analysis.py --config $(CONFIG)

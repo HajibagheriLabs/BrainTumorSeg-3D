@@ -65,7 +65,8 @@ def label_maps(
 def _separate(
     mask: np.ndarray, other: np.ndarray, voxel_ml: float
 ) -> tuple[float, int]:
-    # connected components of one mask that share no voxel with the other mask
+    # volume and count of the components of mask that share no voxel at all with other;
+    # touching is enough to count as found, because overlap is already what dice measures
     components, count = ndimage.label(mask)
     sizes = np.bincount(components.ravel(), minlength=count + 1)
     apart = np.setdiff1d(np.arange(1, count + 1), np.unique(components[other]))
@@ -123,6 +124,27 @@ def annotator_confusion(cfg: Config, device: torch.device) -> np.ndarray:
     return confusion.cpu().numpy()
 
 
+def lesion_contrast(
+    cfg: Config, case_ids: list[str], modalities: tuple[str, ...], device: torch.device
+) -> pd.DataFrame:
+    """Mean normalised intensity of every sequence inside each true region, per case."""
+    processed = cfg.data.processed_dir
+    rows = []
+    for case_id in case_ids:
+        image = torch.from_numpy(np.load(processed / "images" / f"{case_id}.npy"))
+        truth = torch.from_numpy(np.load(processed / "labels" / f"{case_id}.npy")[0])
+        image, truth = image.to(device), truth.to(device)
+        row: dict[str, float | str] = {"case_id": case_id}
+        for region, labels in cfg.data.regions.items():
+            inside = region_mask(truth, labels)
+            for channel, modality in enumerate(modalities):
+                # the mean of no voxels is nan, which leaves an absent region out later
+                values = image[channel][inside].float()
+                row[f"{region}_{modality}_z"] = values.mean().item()
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
 def confusion_table(
     confusion: np.ndarray, names: dict[int, str], source: str
 ) -> pd.DataFrame:
@@ -165,22 +187,54 @@ def spearman_interval(
     }
 
 
-def volume_correlations(
-    sources: dict[str, pd.DataFrame], regions: list[str], seed: int
+def partial_spearman(x: np.ndarray, y: np.ndarray, control: np.ndarray) -> float:
+    """Spearman correlation of x and y with the rank of a third variable held fixed."""
+    keep = ~(np.isnan(x) | np.isnan(y) | np.isnan(control))
+    xy, xc, yc = (
+        stats.spearmanr(a[keep], b[keep]).statistic
+        for a, b in ((x, y), (x, control), (y, control))
+    )
+    return float((xy - xc * yc) / math.sqrt((1.0 - xc**2) * (1.0 - yc**2)))
+
+
+def _volume(table: pd.DataFrame, region: str) -> np.ndarray:
+    # an absent region has no score and no volume to rank
+    volume = table[f"{region}_truth_ml"].to_numpy()
+    return np.where(volume > 0, volume, np.nan)
+
+
+def covariate_correlations(
+    sources: dict[str, pd.DataFrame],
+    regions: list[str],
+    modalities: tuple[str, ...],
+    seed: int,
 ) -> pd.DataFrame:
+    """How each score tracks lesion volume and lesion contrast, for every source."""
     rng = np.random.default_rng(seed)
     rows = []
+    # volume first and in one pass, so its intervals do not depend on the covariates after it
     for source, table in sources.items():
         for region in regions:
-            volume = table[f"{region}_truth_ml"].to_numpy()
-            # an absent region has no score and no volume to rank
-            volume = np.where(volume > 0, volume, np.nan)
             for metric in ("dice", "hd95"):
                 scores = table[f"{region}_{metric}"].to_numpy()
-                rows.append(
-                    {"source": source, "region": region, "metric": metric}
-                    | spearman_interval(volume, scores, rng)
-                )
+                row = {"source": source, "region": region, "covariate": "volume"}
+                row |= {"metric": metric}
+                row |= spearman_interval(_volume(table, region), scores, rng)
+                rows.append(row | {"partial_given_volume": np.nan})
+    for source, table in sources.items():
+        for region in regions:
+            volume = _volume(table, region)
+            for modality in modalities:
+                contrast = table[f"{region}_{modality}_z"].to_numpy()
+                for metric in ("dice", "hd95"):
+                    scores = table[f"{region}_{metric}"].to_numpy()
+                    row = {"source": source, "region": region}
+                    row |= {"covariate": f"{modality} intensity", "metric": metric}
+                    row |= spearman_interval(contrast, scores, rng)
+                    row["partial_given_volume"] = partial_spearman(
+                        contrast, scores, volume
+                    )
+                    rows.append(row)
     return pd.DataFrame(rows)
 
 
@@ -191,6 +245,7 @@ def dice_by_volume(cases: pd.DataFrame, regions: list[str]) -> pd.DataFrame:
         present = cases[cases[f"{region}_truth_ml"] > 0]
         volume = present[f"{region}_truth_ml"]
         bins = pd.qcut(volume, VOLUME_BINS, labels=False) + 1
+        lost = (1.0 - present[f"{region}_dice"]).sum()
         for number, part in present.groupby(bins):
             dice, hd95 = part[f"{region}_dice"], part[f"{region}_hd95"]
             rows.append(
@@ -203,6 +258,8 @@ def dice_by_volume(cases: pd.DataFrame, regions: list[str]) -> pd.DataFrame:
                     "dice_mean": dice.mean(),
                     "dice_median": dice.median(),
                     "dice_min": dice.min(),
+                    # this bin's part of all the dice the split falls short of 1 by
+                    "deficit_share": (1.0 - dice).sum() / lost,
                     "hd95_median": hd95.median(),
                     "hd95_max": hd95.max(),
                 }
@@ -354,9 +411,8 @@ def volume_figure(
 ) -> None:
     fig, axes = plt.subplots(1, len(regions), figsize=(12, 4.6), sharey=True)
     fig.patch.set_facecolor(SURFACE)
-    found = correlations[correlations["metric"] == "dice"].set_index(
-        ["source", "region"]
-    )
+    of_volume = correlations.query("metric == 'dice' and covariate == 'volume'")
+    found = of_volume.set_index(["source", "region"])
     sources = list(found.index.get_level_values("source").unique())
     for ax, region, colour in zip(axes, regions, REGION_COLOURS, strict=True):
         volume, dice = f"{region}_truth_ml", f"{region}_dice"
@@ -459,6 +515,7 @@ def main() -> None:
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--split", choices=EVAL_SPLITS, default="test")
     parser.add_argument("--out", type=Path, default=Path("reports"))
+    parser.add_argument("--tables-only", action="store_true")
     args = parser.parse_args()
     cfg = load_config(args.config)
     device = runtime_device(cfg)
@@ -468,11 +525,17 @@ def main() -> None:
     index = read_index(cfg.data.root)
 
     ranked = rank_cases(pd.read_csv(run / f"{split}_cases.csv"), regions)
-    errors, confusion = case_errors(cfg, predictions, list(ranked["case_id"]), device)
+    case_ids = list(ranked["case_id"])
+    errors, confusion = case_errors(cfg, predictions, case_ids, device)
     ranked = ranked.merge(errors, on="case_id", validate="one_to_one")
+    contrast = lesion_contrast(cfg, case_ids, index.modalities, device)
+    ranked = ranked.merge(contrast, on="case_id", validate="one_to_one")
     agreement = pd.read_csv(args.out / "annotation_agreement.csv")
-    correlations = volume_correlations(
-        {"model": ranked, "annotators": agreement}, regions, cfg.seed
+    # the kept annotation is the truth of a pair, so its regions give the pair's contrast
+    kept = lesion_contrast(cfg, list(agreement["kept"]), index.modalities, device)
+    agreement = agreement.merge(kept.rename(columns={"case_id": "kept"}), on="kept")
+    correlations = covariate_correlations(
+        {"model": ranked, "annotators": agreement}, regions, index.modalities, cfg.seed
     )
     by_volume = dice_by_volume(ranked, regions)
     between_annotators = annotator_confusion(cfg, device)
@@ -485,9 +548,14 @@ def main() -> None:
 
     options = {"index": False, "lineterminator": "\n", "float_format": "%.6g"}
     ranked.to_csv(args.out / f"{split}_failure_cases.csv", **options)
-    correlations.to_csv(args.out / f"{split}_volume_correlation.csv", **options)
+    correlations.to_csv(args.out / f"{split}_correlations.csv", **options)
     by_volume.to_csv(args.out / f"{split}_dice_by_volume.csv", **options)
     confused.to_csv(args.out / f"{split}_confusion.csv", **options)
+    print(correlations.to_string(index=False))
+    print(by_volume.to_string(index=False))
+    print(confused.to_string(index=False))
+    if args.tables_only:
+        return
 
     figures = args.out / "figures"
     figures.mkdir(parents=True, exist_ok=True)
@@ -513,9 +581,6 @@ def main() -> None:
         f"{cfg.name}: Dice against tumour volume on the {split} split",
         figures / f"{split}_dice_vs_volume.png",
     )
-    print(correlations.to_string(index=False))
-    print(by_volume.to_string(index=False))
-    print(confused.to_string(index=False))
 
 
 if __name__ == "__main__":

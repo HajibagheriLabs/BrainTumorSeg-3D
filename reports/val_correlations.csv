@@ -1,0 +1,61 @@
+source,region,covariate,metric,n,spearman,low,high,partial_given_volume
+model,WT,volume,dice,56,0.694532,0.527259,0.808965,
+model,WT,volume,hd95,56,-0.612625,-0.760298,-0.412708,
+model,TC,volume,dice,56,0.443677,0.202227,0.640771,
+model,TC,volume,hd95,56,-0.173397,-0.411604,0.0891735,
+model,ET,volume,dice,55,0.614141,0.372103,0.79254,
+model,ET,volume,hd95,55,-0.483748,-0.699095,-0.206179,
+annotators,WT,volume,dice,114,0.367833,0.171136,0.543308,
+annotators,WT,volume,hd95,114,-0.201028,-0.385746,-0.00557747,
+annotators,TC,volume,dice,114,0.367104,0.18447,0.524333,
+annotators,TC,volume,hd95,114,-0.190344,-0.367428,-0.00414325,
+annotators,ET,volume,dice,114,0.152615,-0.0407581,0.332688,
+annotators,ET,volume,hd95,114,-0.0214328,-0.203305,0.165162,
+model,WT,FLAIR intensity,dice,56,0.21907,-0.0281471,0.425423,0.433745
+model,WT,FLAIR intensity,hd95,56,-0.162024,-0.403595,0.10636,-0.308439
+model,WT,T1w intensity,dice,56,0.0163363,-0.249054,0.280697,-0.0859831
+model,WT,T1w intensity,hd95,56,0.0098507,-0.255316,0.283151,0.0999278
+model,WT,t1gd intensity,dice,56,0.00109364,-0.265694,0.267723,0.0830411
+model,WT,t1gd intensity,hd95,56,0.0634823,-0.201291,0.319308,0.0151538
+model,WT,T2w intensity,dice,56,0.428845,0.169599,0.635975,0.168609
+model,WT,T2w intensity,hd95,56,-0.444205,-0.647988,-0.194237,-0.229477
+model,TC,FLAIR intensity,dice,56,0.176008,-0.0874803,0.407524,0.423033
+model,TC,FLAIR intensity,hd95,56,-0.416413,-0.607663,-0.179779,-0.533787
+model,TC,T1w intensity,dice,56,0.0183185,-0.261355,0.27984,0.0204067
+model,TC,T1w intensity,hd95,56,-0.0509489,-0.323682,0.22446,-0.0517205
+model,TC,t1gd intensity,dice,56,0.223582,-0.0619249,0.488233,0.433669
+model,TC,t1gd intensity,hd95,56,-0.217473,-0.47601,0.0601601,-0.293884
+model,TC,T2w intensity,dice,56,0.0894053,-0.178817,0.348967,-0.0111761
+model,TC,T2w intensity,hd95,56,-0.175278,-0.416868,0.0988038,-0.142219
+model,ET,FLAIR intensity,dice,55,-0.196176,-0.439157,0.0781409,-0.0685066
+model,ET,FLAIR intensity,hd95,55,0.0225411,-0.231766,0.272318,-0.106444
+model,ET,T1w intensity,dice,55,-0.0834776,-0.346988,0.191993,-0.119494
+model,ET,T1w intensity,hd95,55,0.149321,-0.0983328,0.387631,0.180371
+model,ET,t1gd intensity,dice,55,0.504834,0.264186,0.686941,0.416003
+model,ET,t1gd intensity,hd95,55,-0.424482,-0.620433,-0.183966,-0.327775
+model,ET,T2w intensity,dice,55,0.149495,-0.137388,0.412353,0.107943
+model,ET,T2w intensity,hd95,55,-0.170849,-0.441567,0.122859,-0.137675
+annotators,WT,FLAIR intensity,dice,114,-0.0759701,-0.264477,0.121109,-0.0341591
+annotators,WT,FLAIR intensity,hd95,114,0.14657,-0.0380334,0.321177,0.125753
+annotators,WT,T1w intensity,dice,114,-0.173225,-0.35214,0.0134518,-0.142882
+annotators,WT,T1w intensity,hd95,114,0.249851,0.0679721,0.416175,0.233543
+annotators,WT,t1gd intensity,dice,114,-0.170362,-0.345873,0.0172012,-0.141855
+annotators,WT,t1gd intensity,hd95,114,0.222321,0.0407925,0.390243,0.206257
+annotators,WT,T2w intensity,dice,114,0.268038,0.0685876,0.448799,0.155239
+annotators,WT,T2w intensity,hd95,114,-0.169258,-0.348321,0.0191555,-0.105483
+annotators,TC,FLAIR intensity,dice,114,-0.148016,-0.329876,0.0402731,-0.141384
+annotators,TC,FLAIR intensity,hd95,114,0.0911443,-0.0963534,0.273363,0.0841402
+annotators,TC,T1w intensity,dice,114,-0.0541539,-0.238611,0.136973,-0.0187249
+annotators,TC,T1w intensity,hd95,114,0.0332154,-0.151169,0.211636,0.014458
+annotators,TC,t1gd intensity,dice,114,-0.137048,-0.323379,0.0566286,-0.0507062
+annotators,TC,t1gd intensity,hd95,114,0.248797,0.058997,0.423639,0.21184
+annotators,TC,T2w intensity,dice,114,0.00490023,-0.177338,0.187767,-0.124275
+annotators,TC,T2w intensity,hd95,114,0.0213177,-0.157628,0.194596,0.0866377
+annotators,ET,FLAIR intensity,dice,114,-0.278904,-0.452898,-0.087632,-0.27693
+annotators,ET,FLAIR intensity,hd95,114,0.229539,0.0453821,0.407345,0.228977
+annotators,ET,T1w intensity,dice,114,-0.194019,-0.365332,-0.0113738,-0.201819
+annotators,ET,T1w intensity,hd95,114,0.281284,0.0994535,0.442803,0.282266
+annotators,ET,t1gd intensity,dice,114,0.0771248,-0.137705,0.28989,0.0597573
+annotators,ET,t1gd intensity,hd95,114,0.161676,-0.0420267,0.364101,0.165533
+annotators,ET,T2w intensity,dice,114,-0.093125,-0.280945,0.10352,-0.120312
+annotators,ET,T2w intensity,hd95,114,0.150449,-0.0425157,0.337296,0.155875
