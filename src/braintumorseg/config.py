@@ -162,8 +162,7 @@ class InferenceConfig:
     sw_batch_size: int
     overlap: float
     blend_mode: str
-    # null scores this config's own checkpoint; a run name reuses that run's model, which
-    # lets inference-only ablations evaluate a trained model without retraining it
+    # a run name reuses that run's checkpoint, so inference ablations need no retraining
     checkpoint_run: str | None
 
     def __post_init__(self) -> None:

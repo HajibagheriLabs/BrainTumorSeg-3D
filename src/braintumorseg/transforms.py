@@ -19,8 +19,7 @@ KEYS = ("image", "label")
 
 
 def _load(device: torch.device) -> list:
-    # cropping and normalisation happened once in preprocessing; these steps are
-    # deterministic, so a CacheDataset keeps their float16 output resident on the device
+    # deterministic steps only, so a CacheDataset keeps their float16 output on the device
     return [
         LoadImaged(keys=KEYS, reader="NumpyReader", dtype=None, image_only=True),
         EnsureTyped(keys=KEYS, device=device, track_meta=False),

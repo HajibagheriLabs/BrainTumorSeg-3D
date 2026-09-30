@@ -45,8 +45,7 @@ def test_perfect_overlap_scores_one_and_disjoint_masks_score_zero() -> None:
 def test_half_overlap_uses_both_mask_sizes_in_the_denominator() -> None:
     # 4 voxels each, sharing 2: 2 * 2 / (4 + 4)
     assert dice(line(0, 4), line(2, 6)) == 0.5
-    # prediction is 3 of the truth's 6 voxels: 2 * 3 / (3 + 6) = 2/3, where iou would give
-    # 0.5, dividing by twice the truth 0.5, and dividing by twice the prediction 1.0
+    # 3 of 6 truth voxels: 2 * 3 / (3 + 6), where iou or a one-sided denominator gives 0.5 or 1
     assert dice(line(0, 3), line(0, 6)) == pytest.approx(2 / 3)
 
 
@@ -76,16 +75,14 @@ def test_hd95_matches_hand_computed_distances() -> None:
     assert hd95(corner, far, UNIT, PENALTY) == pytest.approx(5.0)
     # spacing scales each axis: sqrt((3 * 2)^2 + (4 * 1)^2)
     assert hd95(corner, far, (2.0, 1.0, 1.0), PENALTY) == pytest.approx(math.sqrt(52))
-    # prediction voxels lie 0 and 5 from the truth, the truth voxel lies 0 from the
-    # prediction; the 95th percentile of [0, 5] interpolates to 4.75 and the larger side wins
+    # directed distances [0, 5] and [0]: the 95th percentile of [0, 5] interpolates to 4.75
     pred = voxels((0, 0, 0), (0, 0, 5))
     assert hd95(pred, corner, UNIT, PENALTY) == pytest.approx(4.75)
     # a 3x3x3 cube has 26 surface voxels, all but its centre
     cube = torch.zeros(SHAPE, dtype=torch.bool)
     cube[1:4, 1:4, 1:4] = True
     assert int(surface(cube).sum()) == 26 and not surface(cube)[2, 2, 2]
-    # distances run between surfaces: a solid cube and its hollow shell share one surface,
-    # so hd95 is 0, where counting the 27 interior voxels would give 1
+    # a solid cube and its hollow shell share a surface: hd95 is 0, whole masks would give 1
     solid = torch.zeros(SHAPE, dtype=torch.bool)
     solid[:5, :5, :5] = True
     shell = solid.clone()

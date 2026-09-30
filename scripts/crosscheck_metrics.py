@@ -17,8 +17,7 @@ TOLERANCE = {"dice": 1e-6, "hd95": 1e-3}
 
 
 def _pairs(splits: dict, count: int) -> list[tuple[str, str]]:
-    # half re-annotated scans (small, realistic disagreements), half different patients
-    # (large distances); both lists are deterministic so the report is reproducible
+    # re-annotated scans give small realistic distances, different patients large ones
     duplicates = [tuple(pair) for pair in splits["exact_duplicates"][-(count // 2) :]]
     others = count - len(duplicates)
     cases = sorted(splits["train"] + splits["val"] + splits["test"])

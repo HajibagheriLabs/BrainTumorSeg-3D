@@ -38,12 +38,12 @@ def seed_everything(seed: int) -> None:
 
 
 def build_loss(name: str) -> nn.Module:
-    # background fills most of every patch, so the dice term scores tumour classes only;
-    # batch dice avoids unstable 0/0 terms for classes absent from a single patch
     options = {
         "to_onehot_y": True,
         "softmax": True,
+        # background fills most of every patch, so the dice term scores tumour classes only
         "include_background": False,
+        # a class absent from one patch would give a 0/0 term, so dice spans the batch
         "batch": True,
     }
     losses = {"dice": DiceLoss, "dice_ce": DiceCELoss, "dice_focal": DiceFocalLoss}
@@ -177,8 +177,7 @@ def train(cfg: Config, device: torch.device) -> Path:
     splits = read_splits(cfg.data.splits_file)
     transform = train_transforms(cfg, device)
     transform.set_random_state(seed=cfg.seed)
-    # nothing downstream writes into a cached volume (the random crop yields new tensors),
-    # so both caches are shared without per-sample copies
+    # crops are new tensors, so the cached volumes are shared without a copy per sample
     cache = {"cache_rate": float(cfg.runtime.cache_on_device), "num_workers": 1}
     cache |= {"copy_cache": False, "progress": False}
     train_set = CacheDataset(case_records(cfg, splits["train"]), transform, **cache)

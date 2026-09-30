@@ -62,11 +62,9 @@ def label_maps(
     return truth, pred
 
 
-def _separate(
+def _untouched(
     mask: np.ndarray, other: np.ndarray, voxel_ml: float
 ) -> tuple[float, int]:
-    # volume and count of the components of mask that share no voxel at all with other;
-    # touching is enough to count as found, because overlap is already what dice measures
     components, count = ndimage.label(mask)
     sizes = np.bincount(components.ravel(), minlength=count + 1)
     apart = np.setdiff1d(np.arange(1, count + 1), np.unique(components[other]))
@@ -98,12 +96,12 @@ def case_errors(
             found = region_mask(pred_gpu, labels)
             row[f"{region}_missed_ml"] = int((wanted & ~found).sum()) * voxel_ml
             row[f"{region}_extra_ml"] = int((found & ~wanted).sum()) * voxel_ml
-        # any tumour label counts here: a lesion is found if the prediction touches it at all
+        # a component counts as found if the other mask touches it: dice already scores overlap
         tumour, predicted = truth > 0, pred > 0
-        row["detached_pred_ml"], row["detached_pred_count"] = _separate(
+        row["detached_pred_ml"], row["detached_pred_count"] = _untouched(
             predicted, tumour, voxel_ml
         )
-        row["unfound_truth_ml"], row["unfound_truth_count"] = _separate(
+        row["unfound_truth_ml"], row["unfound_truth_count"] = _untouched(
             tumour, predicted, voxel_ml
         )
         rows.append(row)
@@ -258,7 +256,6 @@ def dice_by_volume(cases: pd.DataFrame, regions: list[str]) -> pd.DataFrame:
                     "dice_mean": dice.mean(),
                     "dice_median": dice.median(),
                     "dice_min": dice.min(),
-                    # this bin's part of all the dice the split falls short of 1 by
                     "deficit_share": (1.0 - dice).sum() / lost,
                     "hd95_median": hd95.median(),
                     "hd95_max": hd95.max(),

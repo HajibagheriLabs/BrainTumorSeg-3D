@@ -13,8 +13,7 @@ data:
     val: 0.15
     test: 0.15
     seed: 42
-  # msd has no patient ids but repeats patients across case ids; cases whose
-  # atlas-space thumbnails are this similar are treated as one patient, see DECISIONS.md
+  # msd repeats patients across case ids; thumbnails this similar are linked as one patient
   link:
     thumbnail_factor: 4
     threshold: 0.55
@@ -64,8 +63,7 @@ inference:
 runtime:
   device: cuda
   num_threads: 2
-  # the cropped float16 cases fit in 24 GB next to the model, so after one load from disk
-  # every crop and augmentation runs on the gpu and the cpu only launches kernels
+  # the float16 cases fit in 24 GB beside the model, so every crop and augmentation runs there
   cache_on_device: true
   output_dir: runs
   tracking_dir: mlruns

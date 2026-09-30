@@ -85,8 +85,7 @@ def boxplot_figure(
         ax.set_xticks(range(1, len(regions) + 1), regions)
         ax.set_ylabel(METRIC_LABELS[metric], color=INK_SECONDARY, fontsize=9)
         if metric == "hd95":
-            # one miss scores the 373 mm scan diagonal; a linear axis would flatten the rest,
-            # and symlog stays linear below 1 mm because a perfect boundary scores 0
+            # log for the 373 mm misses, symlog because a perfect boundary scores 0
             ax.set_yscale("symlog", linthresh=1.0)
             ax.set_ylim(bottom=0)
             ax.set_yticks(HD95_TICKS, [f"{tick:g}" for tick in HD95_TICKS])
